@@ -400,10 +400,11 @@
     // ============================
     // CONFIG
     // ============================
-    // Si este panel está servido desde el mismo dominio que el Worker (ideal), déjalo vacío.
-    // Si lo subes a GitHub Pages, pon aquí la URL del Worker:
-    // const API_BASE = "https://tu-worker.tuusuario.workers.dev";
-    const API_BASE = "https://mi-api-presupuestos-v5.santibernabebb.workers.dev";
+    // IMPORTANTE:
+    // - El navegador NO debe llamar al Worker directamente (CORS + auth + 401).
+    // - Usamos un proxy en Pages Functions bajo /api/* (mismo dominio que el panel).
+    // - Pages Functions valida el email por Cloudflare Access y firma hacia el Worker.
+    const API_BASE = ""; // mismo origen
 
     // ============================
     // UTIL
@@ -572,7 +573,7 @@
       clearUI();
       setBusy(true);
 
-      const { res, data } = await api(`/admin/user?query=${encodeURIComponent(query)}`, { method:"GET" });
+      const { res, data } = await api(`/api/admin/user?query=${encodeURIComponent(query)}`, { method:"GET" });
 
       if(res.status===401 || res.status===403){
         $("authPill").textContent = "No autorizado (Access)";
@@ -612,7 +613,7 @@
         ? { supportId: currentSupportId, credits, note }
         : { deviceId: currentDeviceId, credits, note };
 
-      const { res, data } = await api(`/admin/add-credits`, { method:"POST", body: JSON.stringify(body) });
+      const { res, data } = await api(`/api/admin/add-credits`, { method:"POST", body: JSON.stringify(body) });
 
       if(res.status===401 || res.status===403){
         showToast("No autorizado (Access)", "info", 5200);
@@ -626,7 +627,6 @@
       }
 
       showToast("Créditos añadidos", "ok");
-      // recargar datos del usuario para actualizar compras/logs/quota
       await loadUser();
       setBusy(false, "Autorizado");
     }
@@ -641,7 +641,7 @@
 
       setBusy(true);
       const body = currentSupportId ? { supportId: currentSupportId, note } : { deviceId: currentDeviceId, note };
-      const { res, data } = await api(`/admin/reconcile`, { method:"POST", body: JSON.stringify(body) });
+      const { res, data } = await api(`/api/admin/reconcile`, { method:"POST", body: JSON.stringify(body) });
 
       if(res.status===401 || res.status===403){
         showToast("No autorizado (Access)", "info", 5200);
