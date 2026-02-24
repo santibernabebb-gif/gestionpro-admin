@@ -259,10 +259,34 @@
       </div>
     </div>
 
-    <div class="grid">
+    
+    <div class="grid" style="margin-top:16px">
+      <div class="card" style="grid-column: 1 / -1">
+        <div class="hd">
+          <h2>Compradores</h2>
+          <div class="pill" id="buyersPill">—</div>
+        </div>
+        <div class="bd">
+          <div class="formline" style="gap:10px; flex-wrap:wrap">
+            <button id="loadBuyersBtn" class="btn" type="button">Listar IDs con compras</button>
+            <button id="moreBuyersBtn" class="btn" type="button" style="display:none">Cargar más</button>
+            <div class="muted" style="font-size:12px">Solo muestra deviceId que tienen compras <span class="mono">PURCHASED</span>.</div>
+          </div>
+          <div id="buyersBox" class="subtle" style="margin-top:12px; display:none">
+            <div class="muted" style="font-size:12px;margin-bottom:8px">
+              Tip: haz click en un deviceId para cargarlo arriba automáticamente.
+            </div>
+            <div id="buyersList" style="display:flex; flex-wrap:wrap; gap:8px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<div class="grid">
       <div class="card">
         <div class="hd">
           <h2>Quota</h2>
+          <button id="localResetBtn" class="btn" type="button" title="Solo visual (no toca el servidor)" style="padding:6px 10px;font-size:12px">Reset vista</button>
           <div id="quotaMeta" class="pill mono">—</div>
         </div>
         <div class="bd">
@@ -682,7 +706,86 @@
     // ============================
     // WIRE UI
     // ============================
-    $("searchBtn").onclick = loadUser;
+    
+    // Reset vista (solo local)
+    function resetVisualQuota() {
+      $("kTotal").textContent = "0";
+      $("kUsed").textContent = "0";
+      $("kRem").textContent = "0";
+      $("quotaMeta").textContent = "Reset visual (local)";
+      showToast("Vista reseteada localmente (no afecta al servidor)", "info");
+    }
+
+
+    // ============================
+    // COMPRADORES (lista de deviceId con compras)
+    // ============================
+    let buyersCursor = 0;
+    const BUYERS_LIMIT = 60;
+
+    async function loadBuyers(reset = false) {
+      if (reset) {
+        buyersCursor = 0;
+        $("buyersList").innerHTML = "";
+      }
+      $("buyersPill").textContent = "Cargando...";
+      $("buyersBox").style.display = "none";
+      $("moreBuyersBtn").style.display = "none";
+
+      const url = `${API_BASE}/api/admin/purchasers?limit=${BUYERS_LIMIT}&cursor=${buyersCursor}`;
+      let r, data;
+      try {
+        r = await fetch(url, { method: "GET" });
+        const ct = r.headers.get("content-type") || "";
+        data = ct.includes("application/json") ? await r.json() : { ok:false, error: await r.text() };
+      } catch (e) {
+        showToast("Error cargando compradores", "error");
+        $("buyersPill").textContent = "Error";
+        return;
+      }
+
+      if (!r.ok || !data?.ok) {
+        const msg = data?.error ? `${data.error}${data.detail ? " — " + data.detail : ""}` : `HTTP ${r.status}`;
+        showToast(`No se pudo listar compradores: ${msg}`, "error", 6000);
+        $("buyersPill").textContent = "Error";
+        return;
+      }
+
+      const items = data.items || [];
+      if (items.length === 0 && buyersCursor === 0) {
+        $("buyersPill").textContent = "0";
+        $("buyersBox").style.display = "none";
+        showToast("No hay compras registradas todavía.", "info");
+        return;
+      }
+
+      $("buyersBox").style.display = "block";
+      items.forEach(it => {
+        const btn = document.createElement("button");
+        btn.className = "btn";
+        btn.type = "button";
+        btn.style.padding = "6px 10px";
+        btn.style.fontSize = "12px";
+        btn.textContent = it.deviceId;
+        btn.title = `Última compra: ${it.last_purchase_at || "—"} | Créditos comprados: ${it.credits_purchased ?? "—"}`;
+        btn.onclick = () => {
+          $("q").value = it.deviceId;
+          loadUser();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        };
+        $("buyersList").appendChild(btn);
+      });
+
+      const totalShown = $("buyersList").children.length;
+      $("buyersPill").textContent = String(totalShown);
+
+      if (data.nextCursor != null) {
+        buyersCursor = data.nextCursor;
+        $("moreBuyersBtn").style.display = "inline-flex";
+      }
+    }
+
+$("searchBtn").onclick = loadUser;
     $("q").addEventListener("keydown", (e) => { if(e.key==="Enter") loadUser(); });
 
     document.querySelectorAll("[data-add]").forEach(btn => {
@@ -696,6 +799,10 @@
     };
 
     $("reconcileBtn").onclick = reconcile;
+
+    $("localResetBtn").onclick = resetVisualQuota;
+    $("loadBuyersBtn").onclick = () => loadBuyers(true);
+    $("moreBuyersBtn").onclick = () => loadBuyers(false);
 
     // Inicial
     clearUI();
