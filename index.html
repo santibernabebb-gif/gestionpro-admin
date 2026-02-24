@@ -233,6 +233,7 @@
         <div class="actions">
           <span id="authPill" class="pill">Estado: —</span>
           <button id="themeBtn" class="btn small" type="button">🌙</button>
+          <a href="/cdn-cgi/access/logout" class="btn small danger" style="text-decoration:none">Salir</a>
         </div>
       </div>
     </div>
@@ -297,6 +298,11 @@
                   <button class="btn small" data-add="10" type="button">+10</button>
                   <button class="btn small" data-add="30" type="button">+30</button>
                   <button class="btn small" data-add="70" type="button">+70</button>
+                </div>
+                <div class="formline" style="justify-content:space-between; margin-top:8px">
+                  <button class="btn small danger" data-add="-10" type="button">−10</button>
+                  <button class="btn small danger" data-add="-30" type="button">−30</button>
+                  <button class="btn small danger" data-add="-70" type="button">−70</button>
                 </div>
                 <div style="margin-top:10px" class="formline">
                   <input id="customCredits" class="input" placeholder="Créditos custom (ej: 15)" style="min-width:160px" />
@@ -584,7 +590,10 @@
 
       if(!data || !data.ok){
         $("authPill").textContent = "Error";
-        showToast(data?.error || `Error HTTP ${res.status}`, "info", 5200);
+        const errMsg = data?.error || `Error HTTP ${res.status}`;
+        const errDetail = data?.detail ? ` — ${data.detail}` : "";
+        showToast(errMsg + errDetail, "info", 7000);
+        $("actionInfo").textContent = `Error: ${errMsg}${errDetail}`;
         setBusy(false, "Error");
         return;
       }
@@ -605,7 +614,7 @@
       }
       const note = $("note").value.trim();
 
-      const ok = confirm(`¿Seguro que quieres añadir ${credits} créditos?`);
+      const ok = confirm(`¿Seguro que quieres ${credits > 0 ? "añadir" : "quitar"} ${Math.abs(credits)} créditos?`);
       if(!ok) return;
 
       setBusy(true);
@@ -619,12 +628,15 @@
         return;
       }
       if(!data || !data.ok){
-        showToast(data?.error || `Error HTTP ${res.status}`, "info", 5200);
+        const errMsg = data?.error || `Error HTTP ${res.status}`;
+        const errDetail = data?.detail ? ` — ${data.detail}` : "";
+        showToast(errMsg + errDetail, "info", 7000);
+        $("actionInfo").textContent = `Error: ${errMsg}${errDetail}`;
         setBusy(false, "Error");
         return;
       }
 
-      showToast("Créditos añadidos", "ok");
+      showToast(credits > 0 ? "Créditos añadidos" : "Créditos quitados", "ok");
       await loadUser();
       setBusy(false, "Autorizado");
     }
