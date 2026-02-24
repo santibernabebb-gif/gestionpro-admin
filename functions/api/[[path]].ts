@@ -1,5 +1,5 @@
 export const onRequest: PagesFunction = async (context) => {
-  const { request, env } = context;
+  const { request, env } = context; 
 
   // 1) Identidad real desde Cloudflare Access usando la cookie
   const who = await fetchIdentityFromAccess(request);
