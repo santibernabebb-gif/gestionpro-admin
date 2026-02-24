@@ -1,17 +1,22 @@
-const u = new URL(request.url);
-if (u.pathname === "/api/_debug") {
-  const cookie = request.headers.get("cookie") || "";
-  const identity = await fetchIdentityFromAccess(request);
-  return new Response(JSON.stringify({
-    cookieLen: cookie.length,
-    email: identity?.email || "",
-    hasSecret: !!env.ADMIN_PROXY_SECRET,
-    origin: u.origin
-  }), { headers: { "Content-Type": "application/json" }});
-}
-
 export const onRequest: PagesFunction = async (context) => {
   const { request, env } = context;
+
+  const u = new URL(request.url);
+
+  // DEBUG opcional (puedes dejarlo, no molesta)
+  if (u.pathname === "/api/_debug") {
+    const cookie = request.headers.get("cookie") || "";
+    const identity = await fetchIdentityFromAccess(request);
+    return new Response(
+      JSON.stringify({
+        cookieLen: cookie.length,
+        email: identity?.email || "",
+        hasSecret: !!env.ADMIN_PROXY_SECRET,
+        origin: u.origin,
+      }),
+      { headers: { "Content-Type": "application/json" } }
+    );
+  }
 
   // 1) Identity via Access (cookie)
   const who = await fetchIdentityFromAccess(request);
@@ -23,23 +28,20 @@ export const onRequest: PagesFunction = async (context) => {
   }
 
   // 2) Proxy firmado hacia el Worker
-  const url = new URL(request.url);
-
-  const targetPath = url.pathname.replace(/^\/api/, "");
+  const targetPath = u.pathname.replace(/^\/api/, "");
   const targetUrl =
     "https://mi-api-presupuestos-v5.santibernabebb.workers.dev" +
     targetPath +
-    url.search;
+    u.search;
 
   const ts = Date.now().toString();
-  const dataToSign = `${ts}:${email}:${request.method}:${targetPath}:${url.search}`;
+  const dataToSign = `${ts}:${email}:${request.method}:${targetPath}:${u.search}`;
   const sig = await hmacSha256Hex(env.ADMIN_PROXY_SECRET, dataToSign);
 
   const headers = new Headers(request.headers);
   headers.set("x-admin-email", email);
   headers.set("x-admin-ts", ts);
   headers.set("x-admin-sig", sig);
-
   headers.delete("host");
   headers.delete("content-length");
 
