@@ -1,7 +1,7 @@
 export const onRequest: PagesFunction = async (context) => {
   const { request, env } = context;
 
-  // 1) Obtener identidad real desde Cloudflare Access usando la cookie del usuario
+  // 1) Identity via Access (cookie)
   const who = await fetchIdentityFromAccess(request);
   const email = (who?.email || "").toLowerCase();
 
@@ -10,10 +10,9 @@ export const onRequest: PagesFunction = async (context) => {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  // 2) Proxy hacia el Worker firmando la petición
+  // 2) Proxy firmado hacia el Worker
   const url = new URL(request.url);
 
-  // /api/admin/user -> /admin/user
   const targetPath = url.pathname.replace(/^\/api/, "");
   const targetUrl =
     "https://mi-api-presupuestos-v5.santibernabebb.workers.dev" +
@@ -29,7 +28,6 @@ export const onRequest: PagesFunction = async (context) => {
   headers.set("x-admin-ts", ts);
   headers.set("x-admin-sig", sig);
 
-  // Limpieza
   headers.delete("host");
   headers.delete("content-length");
 
@@ -38,33 +36,24 @@ export const onRequest: PagesFunction = async (context) => {
       ? undefined
       : await request.arrayBuffer();
 
-  return fetch(targetUrl, {
-    method: request.method,
-    headers,
-    body,
-  });
+  return fetch(targetUrl, { method: request.method, headers, body });
 };
 
 async function fetchIdentityFromAccess(request: Request) {
-  // Reenviamos cookies para que Access pueda identificar al usuario
   const cookie = request.headers.get("cookie") || "";
-
-  // Usamos el mismo host que está sirviendo Pages
   const u = new URL(request.url);
   const identityUrl = `${u.origin}/cdn-cgi/access/get-identity`;
 
   const r = await fetch(identityUrl, {
     headers: {
       cookie,
-      // algunos navegadores/entornos agradecen pasar user-agent
       "user-agent": request.headers.get("user-agent") || "",
     },
   });
 
   if (!r.ok) return null;
-
   try {
-    return await r.json(); // { email, name, ... }
+    return await r.json();
   } catch {
     return null;
   }
@@ -80,7 +69,5 @@ async function hmacSha256Hex(secret: string, message: string) {
     ["sign"]
   );
   const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
-  return [...new Uint8Array(sig)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
