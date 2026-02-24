@@ -4,692 +4,91 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>GestionPro Admin</title>
-  <style>
-    :root{
-      --bg:#f6f7fb;
-      --card:#ffffff;
-      --text:#0f172a;
-      --muted:#64748b;
-      --border:#e2e8f0;
-      --shadow: 0 10px 30px rgba(2,6,23,.08);
-      --accent:#2563eb;
-      --accent2:#0ea5e9;
-      --danger:#ef4444;
-      --ok:#16a34a;
-      --warn:#f59e0b;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      --radius: 16px;
-    }
-    [data-theme="dark"]{
-      --bg:#0b1220;
-      --card:#0f172a;
-      --text:#e5e7eb;
-      --muted:#94a3b8;
-      --border:#1f2a44;
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
-      --accent:#60a5fa;
-      --accent2:#38bdf8;
-      --danger:#fb7185;
-      --ok:#22c55e;
-      --warn:#fbbf24;
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-      background: radial-gradient(1200px 600px at 20% -10%, rgba(37,99,235,.12), transparent 60%),
-                  radial-gradient(900px 500px at 100% 0%, rgba(14,165,233,.10), transparent 55%),
-                  var(--bg);
-      color:var(--text);
-    }
-    a{color:inherit}
-    .topbar{
-      position:sticky; top:0; z-index:10;
-      backdrop-filter: blur(10px);
-      background: color-mix(in oklab, var(--bg) 70%, transparent);
-      border-bottom:1px solid var(--border);
-    }
-    .wrap{max-width:1120px;margin:0 auto;padding:18px 16px}
-    .row{display:flex;gap:12px;align-items:center;justify-content:space-between}
-    .brand{
-      display:flex; gap:12px; align-items:center;
-      font-weight:800; letter-spacing:.2px;
-    }
-    .logo{
-      width:36px;height:36px;border-radius:12px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      box-shadow: var(--shadow);
-    }
-    .actions{display:flex;gap:10px;align-items:center}
-    .btn{
-      border:1px solid var(--border);
-      background: var(--card);
-      color: var(--text);
-      padding:10px 12px;
-      border-radius: 12px;
-      font-weight:650;
-      cursor:pointer;
-      box-shadow: 0 6px 18px rgba(2,6,23,.06);
-      transition: transform .08s ease, border-color .2s ease, background .2s ease;
-      user-select:none;
-    }
-    .btn:hover{transform: translateY(-1px); border-color: color-mix(in oklab, var(--border) 50%, var(--accent));}
-    .btn.primary{
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border-color: transparent;
-      color:white;
-    }
-    .btn.danger{
-      background: color-mix(in oklab, var(--danger) 12%, var(--card));
-      border-color: color-mix(in oklab, var(--danger) 40%, var(--border));
-      color: color-mix(in oklab, var(--danger) 75%, var(--text));
-    }
-    .btn.small{padding:8px 10px;border-radius:10px;font-weight:700}
-    .pill{
-      font-size:12px;
-      padding:6px 10px;
-      border-radius: 999px;
-      border:1px solid var(--border);
-      color: var(--muted);
-      background: color-mix(in oklab, var(--card) 90%, transparent);
-    }
-    .grid{
-      display:grid;
-      grid-template-columns: 1.2fr .8fr;
-      gap: 14px;
-      margin-top: 16px;
-    }
-    @media (max-width: 980px){
-      .grid{grid-template-columns: 1fr}
-    }
-    .card{
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow:hidden;
-    }
-    .card .hd{
-      padding: 14px 14px 10px 14px;
-      border-bottom: 1px solid var(--border);
-      display:flex; align-items:center; justify-content:space-between; gap:10px;
-    }
-    .card .hd h2{
-      margin:0;
-      font-size: 14px;
-      letter-spacing:.2px;
-      color: color-mix(in oklab, var(--text) 90%, var(--muted));
-    }
-    .card .bd{padding: 14px}
-    .muted{color: var(--muted)}
-    .kpi{
-      display:grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-    }
-    .kpi .box{
-      padding:12px;
-      border-radius: 14px;
-      border:1px solid var(--border);
-      background: color-mix(in oklab, var(--card) 92%, transparent);
-    }
-    .kpi .num{font-size:26px;font-weight:850;line-height:1.1}
-    .kpi .lbl{font-size:12px;color:var(--muted);margin-top:6px}
-    .formline{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-    .input{
-      flex:1;
-      min-width: 220px;
-      border:1px solid var(--border);
-      background: color-mix(in oklab, var(--card) 95%, transparent);
-      padding: 11px 12px;
-      border-radius: 12px;
-      color: var(--text);
-      outline:none;
-    }
-    .input:focus{border-color: color-mix(in oklab, var(--accent) 60%, var(--border)); box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 16%, transparent);}
-    .split{display:grid; grid-template-columns: 1fr 1fr; gap:10px}
-    @media (max-width: 520px){ .split{grid-template-columns:1fr} }
-    .table{
-      width:100%;
-      border-collapse:collapse;
-      font-size: 13px;
-    }
-    .table th, .table td{
-      padding: 10px 10px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-    }
-    .table th{
-      text-align:left;
-      font-size: 12px;
-      color: var(--muted);
-      font-weight: 800;
-      letter-spacing: .2px;
-    }
-    .mono{font-family:var(--mono)}
-    .tag{
-      display:inline-flex; align-items:center; gap:6px;
-      padding: 4px 8px;
-      border-radius: 999px;
-      border:1px solid var(--border);
-      font-size: 12px;
-      color: var(--muted);
-      background: color-mix(in oklab, var(--card) 92%, transparent);
-    }
-    .tag.ok{border-color: color-mix(in oklab, var(--ok) 40%, var(--border)); color: color-mix(in oklab, var(--ok) 70%, var(--text));}
-    .tag.bad{border-color: color-mix(in oklab, var(--danger) 40%, var(--border)); color: color-mix(in oklab, var(--danger) 75%, var(--text));}
-    .tag.warn{border-color: color-mix(in oklab, var(--warn) 45%, var(--border)); color: color-mix(in oklab, var(--warn) 80%, var(--text));}
-    .subtle{
-      padding: 10px 12px;
-      border-radius: 14px;
-      border:1px dashed color-mix(in oklab, var(--border) 75%, var(--muted));
-      background: color-mix(in oklab, var(--card) 90%, transparent);
-      color: var(--muted);
-      font-size: 13px;
-    }
-    .toast{
-      position: fixed;
-      right: 16px;
-      bottom: 16px;
-      width: min(420px, calc(100vw - 32px));
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      z-index: 9999;
-    }
-    .toast .item{
-      border-radius: 14px;
-      padding: 12px 14px;
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-      background: var(--card);
-      display:flex; justify-content:space-between; gap:10px;
-      animation: pop .18s ease-out;
-    }
-    @keyframes pop{from{transform:translateY(6px);opacity:0} to{transform:translateY(0);opacity:1}}
-    .spinner{
-      width:16px;height:16px;border-radius:999px;
-      border:2px solid color-mix(in oklab, var(--muted) 40%, transparent);
-      border-top-color: var(--accent);
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .hr{height:1px;background:var(--border);margin:12px 0}
-    .rightActions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .dangerText{color: color-mix(in oklab, var(--danger) 70%, var(--text));}
-  </style>
 </head>
 <body>
-  <div class="topbar">
-    <div class="wrap">
-      <div class="row">
-        <div class="brand">
-          <div class="logo" aria-hidden="true"></div>
-          <div>
-            <div style="font-size:15px">GestionPro Admin</div>
-            <div class="muted" style="font-size:12px">Backoffice de créditos · D1 como fuente de verdad</div>
-          </div>
-        </div>
-        <div class="actions">
-          <span id="authPill" class="pill">Estado: —</span>
-          <button id="themeBtn" class="btn small" type="button">🌙</button>
-        </div>
-      </div>
-    </div>
-  </div>
+<h2>GestionPro Admin (versión corregida)</h2>
 
-  <div class="wrap">
-    <div class="card">
-      <div class="hd">
-        <h2>Buscar usuario</h2>
-        <div class="rightActions">
-          <span id="who" class="pill mono">—</span>
-        </div>
-      </div>
-      <div class="bd">
-        <div class="formline">
-          <input id="q" class="input" placeholder="deviceId o supportId" />
-          <button id="searchBtn" class="btn primary" type="button">Buscar</button>
-        </div>
-        <div id="hint" class="subtle" style="margin-top:12px">
-          Si ves <b>No autorizado (Access)</b>, abre este panel desde un entorno protegido por Cloudflare Access
-          o asegúrate de estar logueado con el email permitido.
-        </div>
-      </div>
-    </div>
+<input id="q" placeholder="deviceId o supportId" />
+<button onclick="loadUser()">Buscar</button>
 
-    <div class="grid">
-      <div class="card">
-        <div class="hd">
-          <h2>Quota</h2>
-          <div id="quotaMeta" class="pill mono">—</div>
-        </div>
-        <div class="bd">
-          <div class="kpi">
-            <div class="box">
-              <div id="kTotal" class="num">—</div>
-              <div class="lbl">Total</div>
-            </div>
-            <div class="box">
-              <div id="kUsed" class="num">—</div>
-              <div class="lbl">Usados</div>
-            </div>
-            <div class="box">
-              <div id="kRem" class="num">—</div>
-              <div class="lbl">Restantes</div>
-            </div>
-          </div>
+<hr/>
 
-          <div class="hr"></div>
+<div>
+  <strong>deviceId:</strong> <span id="deviceId">—</span><br/>
+  <strong>Total:</strong> <span id="kTotal">—</span><br/>
+  <strong>Usados:</strong> <span id="kUsed">—</span><br/>
+  <strong>Restantes:</strong> <span id="kRem">—</span><br/>
+</div>
 
-          <div class="split">
-            <div>
-              <div class="muted" style="font-size:12px;margin-bottom:6px">Accesos</div>
-              <div class="subtle">
-                <div><b>deviceId</b>: <span id="deviceId" class="mono">—</span></div>
-                <div style="margin-top:6px"><b>supportId</b>: <span id="supportId" class="mono">—</span></div>
-              </div>
-            </div>
-            <div>
-              <div class="muted" style="font-size:12px;margin-bottom:6px">Acciones</div>
-              <div class="subtle">
-                <div class="formline" style="justify-content:space-between">
-                  <button class="btn small" data-add="10" type="button">+10</button>
-                  <button class="btn small" data-add="30" type="button">+30</button>
-                  <button class="btn small" data-add="70" type="button">+70</button>
-                </div>
-                <div style="margin-top:10px" class="formline">
-                  <input id="customCredits" class="input" placeholder="Créditos custom (ej: 15)" style="min-width:160px" />
-                </div>
-                <div style="margin-top:10px" class="formline">
-                  <input id="note" class="input" placeholder="Nota (opcional)" />
-                </div>
-                <div style="margin-top:10px" class="formline">
-                  <button id="applyBtn" class="btn primary" type="button">Aplicar</button>
-                  <button id="reconcileBtn" class="btn" type="button">Reconciliar</button>
-                </div>
-                <div id="actionInfo" class="muted" style="font-size:12px;margin-top:8px">—</div>
-              </div>
-            </div>
-          </div>
+<hr/>
 
-          <div class="hr"></div>
-          <div id="calcBox" class="subtle" style="display:none"></div>
-        </div>
-      </div>
+<button onclick="addCredits(10)">+10</button>
+<button onclick="addCredits(30)">+30</button>
 
-      <div class="card">
-        <div class="hd">
-          <h2>Compras (últimas 20)</h2>
-          <div id="pCount" class="pill">—</div>
-        </div>
-        <div class="bd" style="padding:0">
-          <div style="overflow:auto">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Producto</th>
-                  <th>Estado</th>
-                  <th>Créditos</th>
-                  <th>Token</th>
-                </tr>
-              </thead>
-              <tbody id="purchasesTbody">
-                <tr><td colspan="5" class="muted" style="padding:14px">—</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+<script>
+const API_BASE = "";
 
-      <div class="card" style="grid-column: 1 / -1">
-        <div class="hd">
-          <h2>Logs Admin (últimos 50)</h2>
-          <div id="lCount" class="pill">—</div>
-        </div>
-        <div class="bd" style="padding:0">
-          <div style="overflow:auto">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Admin</th>
-                  <th>Acción</th>
-                  <th>Delta</th>
-                  <th>Nota</th>
-                </tr>
-              </thead>
-              <tbody id="logsTbody">
-                <tr><td colspan="5" class="muted" style="padding:14px">—</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+let currentDeviceId = null;
 
-      <div class="card" id="eventsCard" style="grid-column: 1 / -1; display:none">
-        <div class="hd">
-          <h2>Eventos recientes</h2>
-          <div id="eCount" class="pill">—</div>
-        </div>
-        <div class="bd" style="padding:0">
-          <div style="overflow:auto">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Tipo</th>
-                  <th>Detalle</th>
-                </tr>
-              </thead>
-              <tbody id="eventsTbody">
-                <tr><td colspan="3" class="muted" style="padding:14px">—</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <div class="toast" id="toast"></div>
-
-  <script>
-    // ============================
-    // CONFIG
-    // ============================
-    // IMPORTANTE:
-    // - El navegador NO debe llamar al Worker directamente (CORS + auth + 401).
-    // - Usamos un proxy en Pages Functions bajo /api/* (mismo dominio que el panel).
-    // - Pages Functions valida el email por Cloudflare Access y firma hacia el Worker.
-    const API_BASE = ""; // mismo origen
-
-    // ============================
-    // UTIL
-    // ============================
-    const $ = (id) => document.getElementById(id);
-    const toastHost = $("toast");
-
-    function showToast(msg, kind="info", ttl=3500){
-      const el = document.createElement("div");
-      el.className = "item";
-      const left = document.createElement("div");
-      left.innerHTML = `<div style="font-weight:800;margin-bottom:4px">${kind==="ok"?"✅":"ℹ️"} ${escapeHtml(kind==="ok"?"OK":"Info")}</div>
-                        <div class="muted" style="font-size:13px">${escapeHtml(msg)}</div>`;
-      const right = document.createElement("div");
-      right.innerHTML = `<button class="btn small" type="button">Cerrar</button>`;
-      right.querySelector("button").onclick = () => el.remove();
-      el.appendChild(left);
-      el.appendChild(right);
-      toastHost.appendChild(el);
-      setTimeout(() => { if(el.isConnected) el.remove(); }, ttl);
+async function api(path, opts={}){
+  const res = await fetch(API_BASE + path, {
+    ...opts,
+    headers: {
+      "Content-Type": "application/json",
+      ...(opts.headers||{})
     }
+  });
+  const txt = await res.text();
+  let data = null;
+  try { data = txt ? JSON.parse(txt) : null; } catch { data = { raw: txt }; }
+  return { res, data };
+}
 
-    function escapeHtml(s){
-      return String(s).replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
-    }
+async function loadUser(){
+  const query = document.getElementById("q").value.trim();
+  if(!query) return alert("Pon un deviceId o supportId");
 
-    function fmtInt(n){
-      if(n===null||n===undefined||Number.isNaN(Number(n))) return "—";
-      return new Intl.NumberFormat("es-ES").format(Number(n));
-    }
+  const { res, data } = await api(`/api/admin/user?query=${encodeURIComponent(query)}`);
 
-    function tagForState(state){
-      const s = String(state||"").toUpperCase();
-      if(s.includes("VALID") || s.includes("PURCHASED") || s==="1" || s==="OK") return `<span class="tag ok">OK</span>`;
-      if(s.includes("PENDING")) return `<span class="tag warn">PENDING</span>`;
-      return `<span class="tag bad">${escapeHtml(state||"—")}</span>`;
-    }
+  if(!data || !data.ok){
+    alert("Error: " + (data?.error || res.status));
+    return;
+  }
 
-    function setBusy(isBusy, label){
-      $("searchBtn").disabled = isBusy;
-      $("applyBtn").disabled = isBusy;
-      $("reconcileBtn").disabled = isBusy;
-      document.querySelectorAll("[data-add]").forEach(b => b.disabled = isBusy);
-      $("authPill").innerHTML = isBusy ? `Cargando <span class="spinner" style="display:inline-block;vertical-align:-3px;margin-left:8px"></span>` : (label || $("authPill").textContent);
-    }
+  currentDeviceId = data.deviceId;
 
-    async function api(path, opts={}){
-      const url = API_BASE + path;
-      const res = await fetch(url, {
-        ...opts,
-        headers: {
-          "Content-Type": "application/json",
-          ...(opts.headers||{})
-        }
-      });
-      const txt = await res.text();
-      let data = null;
-      try { data = txt ? JSON.parse(txt) : null; } catch { data = { ok:false, error:"NON_JSON_RESPONSE", raw: txt }; }
-      return { res, data };
-    }
+  document.getElementById("deviceId").textContent = data.deviceId;
+  document.getElementById("kTotal").textContent = data.quota.total;
+  document.getElementById("kUsed").textContent = data.quota.used;
+  document.getElementById("kRem").textContent = data.quota.remaining;
+}
 
-    // ============================
-    // THEME
-    // ============================
-    const themeKey = "gp_admin_theme";
-    function applyTheme(t){
-      document.documentElement.setAttribute("data-theme", t);
-      $("themeBtn").textContent = (t==="dark") ? "☀️" : "🌙";
-      localStorage.setItem(themeKey, t);
-    }
-    applyTheme(localStorage.getItem(themeKey) || (window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light"));
-    $("themeBtn").onclick = () => applyTheme(document.documentElement.getAttribute("data-theme")==="dark" ? "light" : "dark");
+async function addCredits(amount){
+  if(!currentDeviceId){
+    alert("Primero busca usuario");
+    return;
+  }
 
-    // ============================
-    // STATE
-    // ============================
-    let currentDeviceId = null;
-    let currentSupportId = null;
+  const body = {
+    deviceId: currentDeviceId,
+    credits: amount
+  };
 
-    function clearUI(){
-      $("kTotal").textContent = "—";
-      $("kUsed").textContent = "—";
-      $("kRem").textContent = "—";
-      $("quotaMeta").textContent = "—";
-      $("deviceId").textContent = "—";
-      $("supportId").textContent = "—";
-      $("who").textContent = "—";
-      $("pCount").textContent = "—";
-      $("lCount").textContent = "—";
-      $("actionInfo").textContent = "—";
-      $("calcBox").style.display = "none";
-      $("eventsCard").style.display = "none";
-      $("purchasesTbody").innerHTML = `<tr><td colspan="5" class="muted" style="padding:14px">—</td></tr>`;
-      $("logsTbody").innerHTML = `<tr><td colspan="5" class="muted" style="padding:14px">—</td></tr>`;
-      $("eventsTbody").innerHTML = `<tr><td colspan="3" class="muted" style="padding:14px">—</td></tr>`;
-      currentDeviceId = null;
-      currentSupportId = null;
-    }
+  const { res, data } = await api(`/api/admin/add-credits`, {
+    method:"POST",
+    body: JSON.stringify(body)
+  });
 
-    function renderUser(payload){
-      currentDeviceId = payload.deviceId || null;
-      currentSupportId = payload.supportId || null;
+  if(!data || !data.ok){
+    alert("Error al sumar: " + (data?.error || res.status));
+    return;
+  }
 
-      $("deviceId").textContent = currentDeviceId || "—";
-      $("supportId").textContent = currentSupportId || "—";
+  alert("Créditos añadidos correctamente");
+  await loadUser();
+}
+</script>
 
-      const q = payload.quota || {};
-      $("kTotal").textContent = fmtInt(q.total);
-      $("kUsed").textContent = fmtInt(q.used);
-      $("kRem").textContent = fmtInt(q.remaining);
-
-      $("quotaMeta").textContent = payload.updatedAt ? `updated_at=${payload.updatedAt}` : "—";
-      $("who").textContent = (currentSupportId ? `supportId:${currentSupportId}` : "") + (currentDeviceId ? ` deviceId:${currentDeviceId.slice(0,10)}…` : "");
-
-      const purchases = Array.isArray(payload.purchases) ? payload.purchases : [];
-      $("pCount").textContent = `${purchases.length} items`;
-      if(purchases.length===0){
-        $("purchasesTbody").innerHTML = `<tr><td colspan="5" class="muted" style="padding:14px">Sin compras</td></tr>`;
-      } else {
-        $("purchasesTbody").innerHTML = purchases.map(p => `
-          <tr>
-            <td class="mono">${escapeHtml(p.created_at || "—")}</td>
-            <td>${escapeHtml(p.product_id || "—")}</td>
-            <td>${tagForState(p.purchase_state)}</td>
-            <td class="mono">${fmtInt(p.credits_added)}</td>
-            <td class="mono">${escapeHtml(p.purchase_token_masked || "—")}</td>
-          </tr>
-        `).join("");
-      }
-
-      const logs = Array.isArray(payload.logs) ? payload.logs : [];
-      $("lCount").textContent = `${logs.length} items`;
-      if(logs.length===0){
-        $("logsTbody").innerHTML = `<tr><td colspan="5" class="muted" style="padding:14px">Sin logs</td></tr>`;
-      } else {
-        $("logsTbody").innerHTML = logs.map(l => `
-          <tr>
-            <td class="mono">${escapeHtml(l.created_at || "—")}</td>
-            <td class="mono">${escapeHtml(l.admin_email || "—")}</td>
-            <td><span class="tag">${escapeHtml(l.action || "—")}</span></td>
-            <td class="mono">${fmtInt(l.delta_credits || 0)}</td>
-            <td>${escapeHtml(l.note || "")}</td>
-          </tr>
-        `).join("");
-      }
-
-      if(Array.isArray(payload.events) && payload.events.length){
-        $("eventsCard").style.display = "";
-        $("eCount").textContent = `${payload.events.length} items`;
-        $("eventsTbody").innerHTML = payload.events.map(e => `
-          <tr>
-            <td class="mono">${escapeHtml(e.created_at || "—")}</td>
-            <td><span class="tag">${escapeHtml(e.type || "—")}</span></td>
-            <td>${escapeHtml(e.detail || "")}</td>
-          </tr>
-        `).join("");
-      } else {
-        $("eventsCard").style.display = "none";
-      }
-    }
-
-    async function loadUser(){
-      const query = $("q").value.trim();
-      if(!query){ showToast("Escribe un deviceId o supportId", "info"); return; }
-
-      clearUI();
-      setBusy(true);
-
-      const { res, data } = await api(`/api/admin/user?query=${encodeURIComponent(query)}`, { method:"GET" });
-
-      if(res.status===401 || res.status===403){
-        $("authPill").textContent = "No autorizado (Access)";
-        showToast("No autorizado (Access). Asegúrate de estar logueado con el email permitido.", "info", 5200);
-        setBusy(false, "No autorizado (Access)");
-        return;
-      }
-
-      if(!data || !data.ok){
-        $("authPill").textContent = "Error";
-        showToast(data?.error || `Error HTTP ${res.status}`, "info", 5200);
-        setBusy(false, "Error");
-        return;
-      }
-
-      $("authPill").textContent = "Autorizado";
-      renderUser(data);
-      $("actionInfo").textContent = "Listo. Puedes añadir créditos o reconciliar.";
-      setBusy(false, "Autorizado");
-    }
-
-    async function addCredits(amount){
-      if(!currentDeviceId && !currentSupportId){
-        showToast("Primero busca un usuario", "info"); return;
-      }
-      const credits = Number(amount);
-      if(!Number.isFinite(credits) || credits===0){
-        showToast("Créditos inválidos", "info"); return;
-      }
-      const note = $("note").value.trim();
-
-      const ok = confirm(`¿Seguro que quieres añadir ${credits} créditos?`);
-      if(!ok) return;
-
-      setBusy(true);
-      const body = currentSupportId
-        ? { supportId: currentSupportId, credits, note }
-        : { deviceId: currentDeviceId, credits, note };
-
-      const { res, data } = await api(`/api/admin/add-credits`, { method:"POST", body: JSON.stringify(body) });
-
-      if(res.status===401 || res.status===403){
-        showToast("No autorizado (Access)", "info", 5200);
-        setBusy(false, "No autorizado (Access)");
-        return;
-      }
-      if(!data || !data.ok){
-        showToast(data?.error || `Error HTTP ${res.status}`, "info", 5200);
-        setBusy(false, "Error");
-        return;
-      }
-
-      showToast("Créditos añadidos", "ok");
-      await loadUser();
-      setBusy(false, "Autorizado");
-    }
-
-    async function reconcile(){
-      if(!currentDeviceId && !currentSupportId){
-        showToast("Primero busca un usuario", "info"); return;
-      }
-      const note = $("note").value.trim();
-      const ok = confirm(`¿Reconciliar créditos total desde compras? (No toca usados)`);
-      if(!ok) return;
-
-      setBusy(true);
-      const body = currentSupportId ? { supportId: currentSupportId, note } : { deviceId: currentDeviceId, note };
-      const { res, data } = await api(`/api/admin/reconcile`, { method:"POST", body: JSON.stringify(body) });
-
-      if(res.status===401 || res.status===403){
-        showToast("No autorizado (Access)", "info", 5200);
-        setBusy(false, "No autorizado (Access)");
-        return;
-      }
-      if(!data || !data.ok){
-        showToast(data?.error || `Error HTTP ${res.status}`, "info", 5200);
-        setBusy(false, "Error");
-        return;
-      }
-
-      if(data.detail){
-        $("calcBox").style.display = "";
-        $("calcBox").innerHTML = `
-          <div style="font-weight:850;margin-bottom:6px">Detalle reconciliación</div>
-          <div class="mono">quotaFree=${escapeHtml(data.detail.quotaFree)}</div>
-          <div class="mono">sumPurchases=${escapeHtml(data.detail.sumPurchases)}</div>
-          <div class="mono">newTotal=${escapeHtml(data.detail.newTotal)}</div>
-        `;
-      }
-
-      showToast("Reconciliado", "ok");
-      await loadUser();
-      setBusy(false, "Autorizado");
-    }
-
-    // ============================
-    // WIRE UI
-    // ============================
-    $("searchBtn").onclick = loadUser;
-    $("q").addEventListener("keydown", (e) => { if(e.key==="Enter") loadUser(); });
-
-    document.querySelectorAll("[data-add]").forEach(btn => {
-      btn.onclick = () => addCredits(btn.getAttribute("data-add"));
-    });
-
-    $("applyBtn").onclick = () => {
-      const v = $("customCredits").value.trim();
-      if(!v){ showToast("Pon créditos custom o usa +10/+30/+70", "info"); return; }
-      addCredits(v);
-    };
-
-    $("reconcileBtn").onclick = reconcile;
-
-    // Inicial
-    clearUI();
-    $("authPill").textContent = "Listo";
-  </script>
 </body>
 </html>
+
