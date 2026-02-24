@@ -1,26 +1,25 @@
 export const onRequest: PagesFunction = async (context) => {
   const { request, env } = context;
 
-  // Access headers (Pages Functions los ve porque es el origin)
-  const email =
-    request.headers.get("cf-access-authenticated-user-email") ||
-    request.headers.get("Cf-Access-Authenticated-User-Email") ||
-    "";
+  // 1) Obtener identidad real desde Cloudflare Access usando la cookie del usuario
+  const who = await fetchIdentityFromAccess(request);
+  const email = (who?.email || "").toLowerCase();
 
   const allowed = "soporte.gestionproapp@gmail.com";
-  if (email.toLowerCase() !== allowed) {
+  if (email !== allowed) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  // Reescritura: /api/admin/user -> /admin/user
+  // 2) Proxy hacia el Worker firmando la petición
   const url = new URL(request.url);
+
+  // /api/admin/user -> /admin/user
   const targetPath = url.pathname.replace(/^\/api/, "");
   const targetUrl =
     "https://mi-api-presupuestos-v5.santibernabebb.workers.dev" +
     targetPath +
     url.search;
 
-  // Firma HMAC
   const ts = Date.now().toString();
   const dataToSign = `${ts}:${email}:${request.method}:${targetPath}:${url.search}`;
   const sig = await hmacSha256Hex(env.ADMIN_PROXY_SECRET, dataToSign);
@@ -29,7 +28,10 @@ export const onRequest: PagesFunction = async (context) => {
   headers.set("x-admin-email", email);
   headers.set("x-admin-ts", ts);
   headers.set("x-admin-sig", sig);
+
+  // Limpieza
   headers.delete("host");
+  headers.delete("content-length");
 
   const body =
     request.method === "GET" || request.method === "HEAD"
@@ -42,6 +44,31 @@ export const onRequest: PagesFunction = async (context) => {
     body,
   });
 };
+
+async function fetchIdentityFromAccess(request: Request) {
+  // Reenviamos cookies para que Access pueda identificar al usuario
+  const cookie = request.headers.get("cookie") || "";
+
+  // Usamos el mismo host que está sirviendo Pages
+  const u = new URL(request.url);
+  const identityUrl = `${u.origin}/cdn-cgi/access/get-identity`;
+
+  const r = await fetch(identityUrl, {
+    headers: {
+      cookie,
+      // algunos navegadores/entornos agradecen pasar user-agent
+      "user-agent": request.headers.get("user-agent") || "",
+    },
+  });
+
+  if (!r.ok) return null;
+
+  try {
+    return await r.json(); // { email, name, ... }
+  } catch {
+    return null;
+  }
+}
 
 async function hmacSha256Hex(secret: string, message: string) {
   const enc = new TextEncoder();
