@@ -1,24 +1,7 @@
 export const onRequest: PagesFunction = async (context) => {
   const { request, env } = context;
 
-  const u = new URL(request.url);
-
-  // DEBUG opcional (puedes dejarlo, no molesta)
-  if (u.pathname === "/api/_debug") {
-    const cookie = request.headers.get("cookie") || "";
-    const identity = await fetchIdentityFromAccess(request);
-    return new Response(
-      JSON.stringify({
-        cookieLen: cookie.length,
-        email: identity?.email || "",
-        hasSecret: !!env.ADMIN_PROXY_SECRET,
-        origin: u.origin,
-      }),
-      { headers: { "Content-Type": "application/json" } }
-    );
-  }
-
-  // 1) Identity via Access (cookie)
+  // 1) Identidad real desde Cloudflare Access usando la cookie del usuario
   const who = await fetchIdentityFromAccess(request);
   const email = (who?.email || "").toLowerCase();
 
@@ -28,6 +11,7 @@ export const onRequest: PagesFunction = async (context) => {
   }
 
   // 2) Proxy firmado hacia el Worker
+  const u = new URL(request.url);
   const targetPath = u.pathname.replace(/^\/api/, "");
   const targetUrl =
     "https://mi-api-presupuestos-v5.santibernabebb.workers.dev" +
@@ -83,5 +67,7 @@ async function hmacSha256Hex(secret: string, message: string) {
     ["sign"]
   );
   const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
-  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return [...new Uint8Array(sig)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
