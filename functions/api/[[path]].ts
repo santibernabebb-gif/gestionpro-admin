@@ -1,3 +1,15 @@
+const u = new URL(request.url);
+if (u.pathname === "/api/_debug") {
+  const cookie = request.headers.get("cookie") || "";
+  const identity = await fetchIdentityFromAccess(request);
+  return new Response(JSON.stringify({
+    cookieLen: cookie.length,
+    email: identity?.email || "",
+    hasSecret: !!env.ADMIN_PROXY_SECRET,
+    origin: u.origin
+  }), { headers: { "Content-Type": "application/json" }});
+}
+
 export const onRequest: PagesFunction = async (context) => {
   const { request, env } = context;
 
