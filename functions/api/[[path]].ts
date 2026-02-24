@@ -1,7 +1,7 @@
 export const onRequest: PagesFunction = async (context) => {
   const { request, env } = context;
 
-  // 1) Identidad real desde Cloudflare Access usando la cookie del usuario
+  // 1) Identidad real desde Cloudflare Access usando la cookie
   const who = await fetchIdentityFromAccess(request);
   const email = (who?.email || "").toLowerCase();
 
@@ -71,3 +71,4 @@ async function hmacSha256Hex(secret: string, message: string) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
