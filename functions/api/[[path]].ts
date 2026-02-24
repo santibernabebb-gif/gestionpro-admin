@@ -10,9 +10,23 @@ export const onRequest: PagesFunction = async (context) => {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  // 2) Proxy firmado hacia el Worker
+  // 2) Allowlist estricta de rutas / métodos
   const u = new URL(request.url);
   const targetPath = u.pathname.replace(/^\/api/, "");
+
+  const allowedRoutes: Record<string, Set<string>> = {
+    "/admin/user": new Set(["GET"]),
+    "/admin/add-credits": new Set(["POST"]),
+    "/admin/reconcile": new Set(["POST"]),
+    "/admin/purchasers": new Set(["GET"]),
+  };
+
+  const allowedMethods = allowedRoutes[targetPath];
+  if (!allowedMethods || !allowedMethods.has(request.method)) {
+    return new Response("Not Found", { status: 404 });
+  }
+
+  // 3) Proxy firmado hacia el Worker
   const targetUrl =
     "https://mi-api-presupuestos-v5.santibernabebb.workers.dev" +
     targetPath +
@@ -22,12 +36,16 @@ export const onRequest: PagesFunction = async (context) => {
   const dataToSign = `${ts}:${email}:${request.method}:${targetPath}:${u.search}`;
   const sig = await hmacSha256Hex(env.ADMIN_PROXY_SECRET, dataToSign);
 
-  const headers = new Headers(request.headers);
+  // Reenviamos solo headers seguros (evita inyección desde el cliente)
+  const headers = new Headers();
+  const contentType = request.headers.get("content-type");
+  if (contentType) headers.set("content-type", contentType);
+  const accept = request.headers.get("accept");
+  if (accept) headers.set("accept", accept);
+
   headers.set("x-admin-email", email);
   headers.set("x-admin-ts", ts);
   headers.set("x-admin-sig", sig);
-  headers.delete("host");
-  headers.delete("content-length");
 
   const body =
     request.method === "GET" || request.method === "HEAD"
@@ -71,4 +89,3 @@ async function hmacSha256Hex(secret: string, message: string) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
-
