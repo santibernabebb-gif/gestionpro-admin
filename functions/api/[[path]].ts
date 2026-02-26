@@ -18,6 +18,7 @@ export const onRequest: PagesFunction = async (context) => {
     "/admin/user": new Set(["GET"]),
     "/admin/add-credits": new Set(["POST"]),
     "/admin/reconcile": new Set(["POST"]),
+    "/admin/reset-user": new Set(["POST"]),
     "/admin/purchasers": new Set(["GET"]),
   };
 
