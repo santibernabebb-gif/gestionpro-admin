@@ -305,6 +305,14 @@
             </div>
           </div>
 
+          <!-- Vista simple para no liarse: disponibles ahora (igual que restantes, pero separado) -->
+          <div class="kpi" style="grid-template-columns: 1fr; margin-top:10px">
+            <div class="box" style="border-color: color-mix(in oklab, var(--accent) 25%, var(--border))">
+              <div id="kAvail" class="num">—</div>
+              <div class="lbl">Créditos disponibles ahora</div>
+            </div>
+          </div>
+
           <div class="hr"></div>
 
           <div class="split">
@@ -337,6 +345,7 @@
                 <div style="margin-top:10px" class="formline">
                   <button id="applyBtn" class="btn primary" type="button">Aplicar</button>
                   <button id="reconcileBtn" class="btn" type="button">Reconciliar</button>
+                  <button id="resetUserBtn" class="btn danger" type="button" title="Deja al usuario con 5 y usados 0">Reset a 5</button>
                 </div>
                 <div id="actionInfo" class="muted" style="font-size:12px;margin-top:8px">—</div>
               </div>
@@ -518,6 +527,7 @@
       $("kTotal").textContent = "—";
       $("kUsed").textContent = "—";
       $("kRem").textContent = "—";
+      $("kAvail").textContent = "—";
       $("quotaMeta").textContent = "—";
       $("deviceId").textContent = "—";
       $("supportId").textContent = "—";
@@ -545,6 +555,7 @@
       $("kTotal").textContent = fmtInt(q.total);
       $("kUsed").textContent = fmtInt(q.used);
       $("kRem").textContent = fmtInt(q.remaining);
+      $("kAvail").textContent = fmtInt(Math.max(0, Number(q.remaining ?? 0)));
 
       $("quotaMeta").textContent = payload.updatedAt ? `updated_at=${payload.updatedAt}` : "—";
       $("who").textContent = (currentSupportId ? `supportId:${currentSupportId}` : "") + (currentDeviceId ? ` deviceId:${currentDeviceId.slice(0,10)}…` : "");
@@ -670,7 +681,7 @@
         showToast("Primero busca un usuario", "info"); return;
       }
       const note = $("note").value.trim();
-      const ok = confirm(`¿Reconciliar créditos total desde compras? (No toca usados)`);
+      const ok = confirm("¿Reconciliar? Recalcula el TOTAL (5 + compras) y, si los USADOS superan el total, los ajusta para que no haya negativos.");
       if(!ok) return;
 
       setBusy(true);
@@ -703,6 +714,34 @@
       setBusy(false, "Autorizado");
     }
 
+    async function resetUser(){
+      if(!currentDeviceId){
+        showToast("Primero busca un usuario", "info"); return;
+      }
+      const note = $("note").value.trim();
+      const ok = confirm("¿Reset a 5? Deja TOTAL=5 y USADOS=0 para este deviceId.");
+      if(!ok) return;
+
+      setBusy(true);
+      const body = currentSupportId ? { supportId: currentSupportId, note } : { deviceId: currentDeviceId, note };
+      const { res, data } = await api(`/api/admin/reset-user`, { method:"POST", body: JSON.stringify(body) });
+
+      if(res.status===401 || res.status===403){
+        showToast("No autorizado (Access)", "info", 5200);
+        setBusy(false, "No autorizado (Access)");
+        return;
+      }
+      if(!data || !data.ok){
+        showToast(data?.error || `Error HTTP ${res.status}`, "info", 5200);
+        setBusy(false, "Error");
+        return;
+      }
+
+      showToast("Usuario reseteado a 5", "ok");
+      await loadUser();
+      setBusy(false, "Autorizado");
+    }
+
     // ============================
     // WIRE UI
     // ============================
@@ -712,6 +751,7 @@
       $("kTotal").textContent = "0";
       $("kUsed").textContent = "0";
       $("kRem").textContent = "0";
+      $("kAvail").textContent = "0";
       $("quotaMeta").textContent = "Reset visual (local)";
       showToast("Vista reseteada localmente (no afecta al servidor)", "info");
     }
@@ -799,6 +839,7 @@ $("searchBtn").onclick = loadUser;
     };
 
     $("reconcileBtn").onclick = reconcile;
+    $("resetUserBtn").onclick = resetUser;
 
     $("localResetBtn").onclick = resetVisualQuota;
     $("loadBuyersBtn").onclick = () => loadBuyers(true);
