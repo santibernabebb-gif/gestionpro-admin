@@ -20,6 +20,7 @@ export const onRequest: PagesFunction = async (context) => {
     "/admin/reconcile": new Set(["POST"]),
     "/admin/reset-user": new Set(["POST"]),
     "/admin/purchasers": new Set(["GET"]),
+    "/admin/api-logs": new Set(["GET"]),
   };
 
   const allowedMethods = allowedRoutes[targetPath];
