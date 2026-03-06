@@ -175,6 +175,17 @@
     .buyer-chip { padding: 5px 10px; border-radius: 7px; background: var(--surface2); border: 1px solid var(--border2); font-family: var(--mono); font-size: 11px; color: var(--muted2); cursor: pointer; transition: all .1s; }
     .buyer-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--blue-dim); }
 
+    /* RECIENTES */
+    .recent-chip {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 7px 11px; border-radius: 8px;
+      background: var(--surface2); border: 1px solid var(--border2);
+      font-size: 11px; cursor: pointer; transition: all .1s; text-align: left;
+    }
+    .recent-chip:hover { border-color: var(--accent); background: var(--blue-dim); }
+    .recent-chip .rc-id { font-family: var(--mono); color: var(--text); font-weight: 500; }
+    .recent-chip .rc-date { color: var(--muted); font-size: 10px; }
+
     /* TOAST */
     .toast-host { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
     .toast-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-md); min-width: 240px; max-width: min(380px,calc(100vw - 32px)); animation: slideUp .15s ease-out; }
@@ -224,16 +235,21 @@
       <div class="card">
         <div class="card-head">
           <div class="card-title"><div class="cicon">🔎</div>Buscar usuario</div>
-          <span id="who" class="mono">—</span>
+          <button id="historyBtn" class="btn sm" title="Recientes">🕐 Recientes <span id="historyCount" class="badge" style="margin-left:4px">0</span></button>
         </div>
         <div class="card-body">
           <div class="irow">
             <input id="q" class="input" placeholder="deviceId o SUP-XXXXXXXX" style="max-width:400px" />
             <button id="searchBtn" class="btn primary">Buscar</button>
           </div>
+          <div id="recentPanel" style="display:none;margin-top:10px">
+            <div class="lbl" style="margin-bottom:6px">Últimas búsquedas</div>
+            <div id="recentList" class="buyers-grid"></div>
+          </div>
           <div id="searchHint" class="info-box" style="margin-top:10px">
             Introduce un <b>deviceId</b> o un <b>supportId</b> (SUP-XXXXXXXX) para cargar los datos del usuario.
           </div>
+          <div id="who" style="display:none"></div>
         </div>
       </div>
 
@@ -428,6 +444,64 @@
 <script>
   const API = "";
   const $ = id => document.getElementById(id);
+  const HISTORY_KEY = "gp_admin_recent";
+  const HISTORY_MAX = 50;
+
+  // ── HISTORIAL LOCAL ──
+  function getHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]"); } catch { return []; }
+  }
+  function saveToHistory(query) {
+    let h = getHistory().filter(i => i.q !== query);
+    h.unshift({ q: query, ts: new Date().toISOString() });
+    if (h.length > HISTORY_MAX) h = h.slice(0, HISTORY_MAX);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+    renderHistory();
+  }
+  function renderHistory() {
+    const h = getHistory();
+    $("historyCount").textContent = h.length;
+    const list = $("recentList");
+    list.innerHTML = "";
+    if (h.length === 0) {
+      list.innerHTML = `<div style="font-size:12px;color:var(--muted)">Sin búsquedas recientes</div>`;
+      return;
+    }
+    h.forEach(item => {
+      const btn = document.createElement("button");
+      btn.className = "recent-chip";
+      const ago = fmtAgo(item.ts);
+      btn.innerHTML = `<span class="rc-id">${esc(item.q.length>22?item.q.slice(0,22)+"…":item.q)}</span><span class="rc-date">${ago}</span>`;
+      btn.title = item.q;
+      btn.onclick = () => {
+        $("q").value = item.q;
+        $("recentPanel").style.display = "none";
+        loadUser();
+      };
+      list.appendChild(btn);
+    });
+  }
+  function fmtAgo(iso) {
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60) return "ahora mismo";
+    if (diff < 3600) return `hace ${Math.floor(diff/60)} min`;
+    if (diff < 86400) return `hace ${Math.floor(diff/3600)} h`;
+    return `hace ${Math.floor(diff/86400)} d`;
+  }
+
+  // Toggle panel recientes
+  $("historyBtn").onclick = () => {
+    const panel = $("recentPanel");
+    panel.style.display = panel.style.display === "none" ? "" : "none";
+  };
+  // Cerrar panel al hacer click fuera
+  document.addEventListener("click", e => {
+    if (!$("recentPanel").contains(e.target) && e.target !== $("historyBtn") && !$("historyBtn").contains(e.target)) {
+      $("recentPanel").style.display = "none";
+    }
+  });
+
+  renderHistory();
 
   function setStatus(state, text) { $("sdot").className="sdot "+state; $("stext").textContent=text; }
 
@@ -525,6 +599,7 @@
     const {r,data}=await apiFetch(`/api/admin/user?query=${encodeURIComponent(q)}`);
     if(r.status===401||r.status===403){setStatus("err","No autorizado");toast("No autorizado — comprueba Cloudflare Access","err",6000);return;}
     if(!data?.ok){setStatus("err","Error");toast((data?.error||`HTTP ${r.status}`)+(data?.detail?" — "+data.detail:""),"err",7000);return;}
+    saveToHistory(q);
     renderUser(data); setStatus("ok","Autorizado"); $("actionInfo").textContent="Listo";
   }
 
