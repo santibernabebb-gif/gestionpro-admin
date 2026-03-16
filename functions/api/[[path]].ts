@@ -12,19 +12,19 @@ export const onRequest: PagesFunction = async (context) => {
   const incomingPath = u.pathname.replace(/^\/api/, "");
 
   const routeTable: Record<string, { methods: Set<string>; worker: "gestionpro" | "activate"; targetPath: string }> = {
-    "/admin/user": { methods: new Set(["GET"]), worker: "gestionpro", targetPath: "/admin/user" },
-    "/admin/add-credits": { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/add-credits" },
-    "/admin/reconcile": { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/reconcile" },
-    "/admin/reset-user": { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/reset-user" },
-    "/admin/purchasers": { methods: new Set(["GET"]), worker: "gestionpro", targetPath: "/admin/purchasers" },
-    "/admin/api-logs": { methods: new Set(["GET"]), worker: "gestionpro", targetPath: "/admin/api-logs" },
+    "/gp/admin/user": { methods: new Set(["GET"]), worker: "gestionpro", targetPath: "/admin/user" },
+    "/gp/admin/add-credits": { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/add-credits" },
+    "/gp/admin/reconcile": { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/reconcile" },
+    "/gp/admin/reset-user": { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/reset-user" },
+    "/gp/admin/purchasers": { methods: new Set(["GET"]), worker: "gestionpro", targetPath: "/admin/purchasers" },
+    "/gp/admin/api-logs": { methods: new Set(["GET"]), worker: "gestionpro", targetPath: "/admin/api-logs" },
 
-    "/activate/user": { methods: new Set(["GET"]), worker: "activate", targetPath: "/admin/user" },
-    "/activate/add-tokens": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/add-tokens" },
-    "/activate/reconcile": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reconcile" },
-    "/activate/reset-user": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reset-user" },
-    "/activate/purchasers": { methods: new Set(["GET"]), worker: "activate", targetPath: "/admin/purchasers" },
-    "/activate/api-logs": { methods: new Set(["GET"]), worker: "activate", targetPath: "/admin/api-logs" },
+    "/activate/admin/user": { methods: new Set(["GET"]), worker: "activate", targetPath: "/admin/user" },
+    "/activate/admin/add-tokens": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/add-tokens" },
+    "/activate/admin/reconcile": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reconcile" },
+    "/activate/admin/reset-user": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reset-user" },
+    "/activate/admin/purchasers": { methods: new Set(["GET"]), worker: "activate", targetPath: "/admin/purchasers" },
+    "/activate/admin/api-logs": { methods: new Set(["GET"]), worker: "activate", targetPath: "/admin/api-logs" },
   };
 
   const matched = routeTable[incomingPath];
