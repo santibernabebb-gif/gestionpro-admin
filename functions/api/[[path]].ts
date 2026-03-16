@@ -1,44 +1,47 @@
 export const onRequest: PagesFunction = async (context) => {
-  const { request, env } = context; 
+  const { request, env } = context;
 
-  // 1) Identidad real desde Cloudflare Access usando la cookie
   const who = await fetchIdentityFromAccess(request);
   const email = (who?.email || "").toLowerCase();
-
   const allowed = "soporte.gestionproapp@gmail.com";
   if (email !== allowed) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  // 2) Allowlist estricta de rutas / métodos
   const u = new URL(request.url);
-  const targetPath = u.pathname.replace(/^\/api/, "");
+  const incomingPath = u.pathname.replace(/^\/api/, "");
 
-  const allowedRoutes: Record<string, Set<string>> = {
-    "/admin/user": new Set(["GET"]),
-    "/admin/add-credits": new Set(["POST"]),
-    "/admin/reconcile": new Set(["POST"]),
-    "/admin/reset-user": new Set(["POST"]),
-    "/admin/purchasers": new Set(["GET"]),
-    "/admin/api-logs": new Set(["GET"]),
+  const routeTable: Record<string, { methods: Set<string>; worker: "gestionpro" | "activate"; targetPath: string }> = {
+    "/admin/user": { methods: new Set(["GET"]), worker: "gestionpro", targetPath: "/admin/user" },
+    "/admin/add-credits": { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/add-credits" },
+    "/admin/reconcile": { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/reconcile" },
+    "/admin/reset-user": { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/reset-user" },
+    "/admin/purchasers": { methods: new Set(["GET"]), worker: "gestionpro", targetPath: "/admin/purchasers" },
+    "/admin/api-logs": { methods: new Set(["GET"]), worker: "gestionpro", targetPath: "/admin/api-logs" },
+
+    "/activate/user": { methods: new Set(["GET"]), worker: "activate", targetPath: "/admin/user" },
+    "/activate/add-tokens": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/add-tokens" },
+    "/activate/reconcile": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reconcile" },
+    "/activate/reset-user": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reset-user" },
+    "/activate/purchasers": { methods: new Set(["GET"]), worker: "activate", targetPath: "/admin/purchasers" },
+    "/activate/api-logs": { methods: new Set(["GET"]), worker: "activate", targetPath: "/admin/api-logs" },
   };
 
-  const allowedMethods = allowedRoutes[targetPath];
-  if (!allowedMethods || !allowedMethods.has(request.method)) {
+  const matched = routeTable[incomingPath];
+  if (!matched || !matched.methods.has(request.method)) {
     return new Response("Not Found", { status: 404 });
   }
 
-  // 3) Proxy firmado hacia el Worker
-  const targetUrl =
-    "https://mi-api-presupuestos-v5.santibernabebb.workers.dev" +
-    targetPath +
-    u.search;
+  const workerBase = matched.worker === "gestionpro"
+    ? "https://mi-api-presupuestos-v5.santibernabebb.workers.dev"
+    : "https://recetassaludablespro.santibernabebb.workers.dev";
+
+  const targetUrl = workerBase + matched.targetPath + u.search;
 
   const ts = Date.now().toString();
-  const dataToSign = `${ts}:${email}:${request.method}:${targetPath}:${u.search}`;
+  const dataToSign = `${ts}:${email}:${request.method}:${matched.targetPath}:${u.search}`;
   const sig = await hmacSha256Hex(env.ADMIN_PROXY_SECRET, dataToSign);
 
-  // Reenviamos solo headers seguros (evita inyección desde el cliente)
   const headers = new Headers();
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
@@ -49,10 +52,9 @@ export const onRequest: PagesFunction = async (context) => {
   headers.set("x-admin-ts", ts);
   headers.set("x-admin-sig", sig);
 
-  const body =
-    request.method === "GET" || request.method === "HEAD"
-      ? undefined
-      : await request.arrayBuffer();
+  const body = request.method === "GET" || request.method === "HEAD"
+    ? undefined
+    : await request.arrayBuffer();
 
   return fetch(targetUrl, { method: request.method, headers, body });
 };
