@@ -336,7 +336,7 @@
 <div class="toast-host" id="toastHost"></div>
 
 <script>
-// ─── Configuración ─────────────────────────────────────────────────────────
+// ─── Variables globales ────────────────────────────────────────────────────
 const WORKER_URLS = {
   gestionpro: "https://mi-api-presupuestos-v5.santibernabebb.workers.dev",
   activate:   "https://recetassaludablespro.santibernabebb.workers.dev",
@@ -346,8 +346,10 @@ const HISTORY_MAX = 50;
 const $ = id => document.getElementById(id);
 
 let SECRET = "";
+let currentApp = localStorage.getItem("admin_current_app") || "gestionpro";
+let currentPrimaryId = null, currentSupportId = null, buyersCursor = 0;
 
-// ─── HMAC en el browser ────────────────────────────────────────────────────
+// ─── HMAC ──────────────────────────────────────────────────────────────────
 async function hmacSha256Hex(secret, message) {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name:"HMAC", hash:"SHA-256" }, false, ["sign"]);
@@ -355,31 +357,23 @@ async function hmacSha256Hex(secret, message) {
   return [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2,"0")).join("");
 }
 
-// ─── Fetch autenticado directo al worker ───────────────────────────────────
+// ─── Fetch autenticado ─────────────────────────────────────────────────────
 async function workerFetch(workerKey, path, opts = {}) {
   const base   = WORKER_URLS[workerKey];
   const method = opts.method || "GET";
   const search = opts.search || "";
   const url    = base + path + search;
   const ts     = Date.now().toString();
-  const data   = `${ts}:${ADMIN_EMAIL}:${method}:${path}:${search}`;
-  const sig    = await hmacSha256Hex(SECRET, data);
-
+  const msg    = `${ts}:${ADMIN_EMAIL}:${method}:${path}:${search}`;
+  const sig    = await hmacSha256Hex(SECRET, msg);
   const fetchOpts = {
     method,
-    headers: {
-      "Content-Type":  "application/json",
-      "x-admin-email": ADMIN_EMAIL,
-      "x-admin-ts":    ts,
-      "x-admin-sig":   sig,
-    },
+    headers: { "Content-Type":"application/json", "x-admin-email":ADMIN_EMAIL, "x-admin-ts":ts, "x-admin-sig":sig },
   };
   if (opts.body) fetchOpts.body = JSON.stringify(opts.body);
-
-  const r   = await fetch(url, fetchOpts);
+  const r = await fetch(url, fetchOpts);
   const txt = await r.text();
-  let json;
-  try { json = JSON.parse(txt); } catch { json = { ok: false, error: "NON_JSON", raw: txt }; }
+  let json; try { json = JSON.parse(txt); } catch { json = { ok:false, error:"NON_JSON", raw:txt }; }
   return { r, data: json };
 }
 
@@ -391,9 +385,7 @@ async function doLogin() {
   $("loginErr").style.display = "none";
   SECRET = pass;
   try {
-    // Verificar el secreto contra GestionPro — si la firma es correcta responde 200 o 404,
-    // si es incorrecta responde 401
-    const { r } = await workerFetch("gestionpro", "/admin/user", { search: "?query=__ping__" });
+    const { r } = await workerFetch("gestionpro", "/admin/user", { search:"?query=__ping__" });
     if (r.status === 401) {
       SECRET = "";
       $("loginErr").textContent = "Contraseña incorrecta";
@@ -401,10 +393,9 @@ async function doLogin() {
       $("loginBtn").disabled = false;
       return;
     }
-    // OK — guardar en sessionStorage para no pedir de nuevo en la misma sesión
     sessionStorage.setItem("admin_secret", pass);
     showApp();
-  } catch (e) {
+  } catch(e) {
     SECRET = "";
     $("loginErr").textContent = "Error de red: " + e.message;
     $("loginErr").style.display = "";
@@ -422,371 +413,287 @@ function showApp() {
   if (last) { $("q").value = last; loadUser(); }
 }
 
-$("loginBtn").onclick = doLogin;
-$("loginPass").addEventListener("keydown", e => e.key === "Enter" && doLogin());
-$("logoutBtn").onclick = () => {
-  SECRET = "";
-  sessionStorage.removeItem("admin_secret");
-  $("app").style.display = "none";
-  $("loginScreen").style.display = "";
-  $("loginPass").value = "";
-  $("loginBtn").disabled = false;
-};
-
-// ─── Apps ──────────────────────────────────────────────────────────────────
+// ─── Apps config ───────────────────────────────────────────────────────────
 const APPS = {
   gestionpro: {
-    key: "gestionpro", worker: "gestionpro",
-    navTitle: "GestionPro Admin", navSub: "Backoffice · Cloudflare D1",
-    searchTitle: "Buscar usuario", searchPlaceholder: "deviceId o SUP-XXXXXXXX",
-    searchHint: 'Introduce un <b>deviceId</b> o un <b>supportId</b> (SUP-XXXXXXXX) para cargar los datos del usuario.',
-    quotaTitle: "Cuota de créditos", availLabel: "Créditos disponibles ahora",
-    totalLabel: "Total", usedLabel: "Usados", remLabel: "Restantes",
-    primaryIdLabel: "deviceId", secondaryIdLabel: "supportId",
-    adjustLabel: "Añadir / quitar créditos",
-    buyersTitle: "Usuarios con compras", purchasesCardTitle: "Compras",
-    adminLogsTitle: "Historial de acciones admin",
-    buyersVisible: true, purchasesVisible: true, reconcileVisible: true,
-    resetLabel: "⚠️ Reset a 5", resetConfirm: "¿Reset a 5? Deja total=5 y usados=0.",
-    searchToast: "Introduce un deviceId o supportId",
-    noBuyersText: "Sin compras registradas", emptyPurchasesText: "Sin compras",
-    adjustSuccessAdd: "Créditos añadidos", adjustSuccessRemove: "Créditos quitados",
-    adjustButtons: [10,30,70,-10,-30,-70],
-    routeUser: "/admin/user", routeAdjust: "/admin/add-credits",
-    routeReconcile: "/admin/reconcile", routeReset: "/admin/reset-user",
-    routeBuyers: "/admin/purchasers", routeApiLogs: "/admin/api-logs",
-    mapUserData(data) {
-      const q = data.quota || {};
-      return {
-        primaryId: data.deviceId || "—", supportId: data.supportId || "—",
-        quota: { total: q.total??0, used: q.used??0, remaining: q.remaining??0 },
-        purchases: Array.isArray(data.purchases) ? data.purchases : [],
-        logs: Array.isArray(data.logs) ? data.logs : [],
-        updatedAt: data.updatedAt || null,
-      };
+    key:"gestionpro", worker:"gestionpro",
+    navTitle:"GestionPro Admin", navSub:"Backoffice · Cloudflare D1",
+    searchTitle:"Buscar usuario", searchPlaceholder:"deviceId o SUP-XXXXXXXX",
+    searchHint:'Introduce un <b>deviceId</b> o un <b>supportId</b> (SUP-XXXXXXXX) para cargar los datos del usuario.',
+    quotaTitle:"Cuota de créditos", availLabel:"Créditos disponibles ahora",
+    totalLabel:"Total", usedLabel:"Usados", remLabel:"Restantes",
+    primaryIdLabel:"deviceId", secondaryIdLabel:"supportId",
+    adjustLabel:"Añadir / quitar créditos",
+    buyersTitle:"Usuarios con compras", purchasesCardTitle:"Compras",
+    adminLogsTitle:"Historial de acciones admin",
+    buyersVisible:true, purchasesVisible:true, reconcileVisible:true,
+    resetLabel:"⚠️ Reset a 5", resetConfirm:"¿Reset a 5? Deja total=5 y usados=0.",
+    searchToast:"Introduce un deviceId o supportId",
+    noBuyersText:"Sin compras registradas", emptyPurchasesText:"Sin compras",
+    adjustSuccessAdd:"Créditos añadidos", adjustSuccessRemove:"Créditos quitados",
+    adjustButtons:[10,30,70,-10,-30,-70],
+    routeUser:"/admin/user", routeAdjust:"/admin/add-credits",
+    routeReconcile:"/admin/reconcile", routeReset:"/admin/reset-user",
+    routeBuyers:"/admin/purchasers", routeApiLogs:"/admin/api-logs",
+    mapUserData(d) {
+      const q=d.quota||{};
+      return { primaryId:d.deviceId||"—", supportId:d.supportId||"—",
+        quota:{total:q.total??0,used:q.used??0,remaining:q.remaining??0},
+        purchases:Array.isArray(d.purchases)?d.purchases:[],
+        logs:Array.isArray(d.logs)?d.logs:[], updatedAt:d.updatedAt||null };
     },
-    buildAdjustBody(pid, sid, amount, note) { return { deviceId: pid, credits: amount, note }; },
-    buildResetBody(pid, sid, note) { const b = (sid&&sid!=="—") ? {supportId:sid} : {deviceId:pid}; b.note=note; return b; },
-    buildReconcileBody(pid, sid, note) { const b = (sid&&sid!=="—") ? {supportId:sid} : {deviceId:pid}; b.note=note; return b; },
+    buildAdjustBody(pid,sid,amount,note){return{deviceId:pid,credits:amount,note};},
+    buildResetBody(pid,sid,note){const b=(sid&&sid!=="—")?{supportId:sid}:{deviceId:pid};b.note=note;return b;},
+    buildReconcileBody(pid,sid,note){const b=(sid&&sid!=="—")?{supportId:sid}:{deviceId:pid};b.note=note;return b;},
   },
   activate: {
-    key: "activate", worker: "activate",
-    navTitle: "Activate Admin", navSub: "Backoffice · Tokens y soporte",
-    searchTitle: "Buscar usuario Activate", searchPlaceholder: "installId o ACT-XXXXXXXX",
-    searchHint: 'Introduce un <b>installId</b> o un <b>supportId</b> (ACT-XXXXXXXX) para cargar el saldo de tokens.',
-    quotaTitle: "Saldo de tokens", availLabel: "Tokens disponibles ahora",
-    totalLabel: "Total", usedLabel: "Consumidos", remLabel: "Disponibles",
-    primaryIdLabel: "installId", secondaryIdLabel: "supportId",
-    adjustLabel: "Añadir / quitar tokens",
-    buyersTitle: "Usuarios Activate", purchasesCardTitle: "Actividad / packs",
-    adminLogsTitle: "Historial de acciones admin",
-    buyersVisible: false, purchasesVisible: false, reconcileVisible: false,
-    resetLabel: "⚠️ Reset gratis", resetConfirm: "¿Resetear usuario? Deja el saldo inicial gratis y limpia el consumo.",
-    searchToast: "Introduce un installId o supportId",
-    noBuyersText: "Este apartado no se usa en Activate", emptyPurchasesText: "Sin actividad de packs",
-    adjustSuccessAdd: "Tokens añadidos", adjustSuccessRemove: "Tokens quitados",
-    adjustButtons: [10,25,null,-10,-25,null],
-    routeUser: "/admin/user", routeAdjust: "/admin/add-tokens",
-    routeReconcile: "/admin/reconcile", routeReset: "/admin/reset-user",
-    routeBuyers: "/admin/purchasers", routeApiLogs: "/admin/api-logs",
-    mapUserData(data) {
-      const q = data.quota || {};
-      return {
-        primaryId: data.installId || data.deviceId || data.id || "—",
-        supportId: data.supportId || "—",
-        quota: { total: q.total??0, used: q.used??0, remaining: q.remaining??0 },
-        purchases: Array.isArray(data.purchases) ? data.purchases : [],
-        logs: Array.isArray(data.logs) ? data.logs : [],
-        updatedAt: data.updatedAt || null,
-      };
+    key:"activate", worker:"activate",
+    navTitle:"Activate Admin", navSub:"Backoffice · Tokens y soporte",
+    searchTitle:"Buscar usuario Activate", searchPlaceholder:"installId o ACT-XXXXXXXX",
+    searchHint:'Introduce un <b>installId</b> o un <b>supportId</b> (ACT-XXXXXXXX) para cargar el saldo de tokens.',
+    quotaTitle:"Saldo de tokens", availLabel:"Tokens disponibles ahora",
+    totalLabel:"Total", usedLabel:"Consumidos", remLabel:"Disponibles",
+    primaryIdLabel:"installId", secondaryIdLabel:"supportId",
+    adjustLabel:"Añadir / quitar tokens",
+    buyersTitle:"Usuarios Activate", purchasesCardTitle:"Actividad / packs",
+    adminLogsTitle:"Historial de acciones admin",
+    buyersVisible:false, purchasesVisible:false, reconcileVisible:false,
+    resetLabel:"⚠️ Reset gratis", resetConfirm:"¿Resetear usuario? Deja el saldo inicial gratis y limpia el consumo.",
+    searchToast:"Introduce un installId o supportId",
+    noBuyersText:"Este apartado no se usa en Activate", emptyPurchasesText:"Sin actividad de packs",
+    adjustSuccessAdd:"Tokens añadidos", adjustSuccessRemove:"Tokens quitados",
+    adjustButtons:[10,25,null,-10,-25,null],
+    routeUser:"/admin/user", routeAdjust:"/admin/add-tokens",
+    routeReconcile:"/admin/reconcile", routeReset:"/admin/reset-user",
+    routeBuyers:"/admin/purchasers", routeApiLogs:"/admin/api-logs",
+    mapUserData(d) {
+      const q=d.quota||{};
+      return { primaryId:d.installId||d.deviceId||d.id||"—", supportId:d.supportId||"—",
+        quota:{total:q.total??0,used:q.used??0,remaining:q.remaining??0},
+        purchases:Array.isArray(d.purchases)?d.purchases:[],
+        logs:Array.isArray(d.logs)?d.logs:[], updatedAt:d.updatedAt||null };
     },
-    buildAdjustBody(pid, sid, amount, note) { return { id: pid, amount, note }; },
-    buildResetBody(pid, sid, note) { return { id: pid, note }; },
-    buildReconcileBody(pid, sid, note) { return { id: pid, note }; },
+    buildAdjustBody(pid,sid,amount,note){return{id:pid,amount,note};},
+    buildResetBody(pid,sid,note){return{id:pid,note};},
+    buildReconcileBody(pid,sid,note){return{id:pid,note};},
   }
 };
 
-let currentApp = localStorage.getItem("admin_current_app") || "gestionpro";
-let currentPrimaryId = null, currentSupportId = null, buyersCursor = 0;
-
-function historyKey() { return `admin_recent_${currentApp}`; }
-function getHistory() { try { return JSON.parse(localStorage.getItem(historyKey())||"[]"); } catch { return []; } }
-function saveToHistory(query) {
-  let h = getHistory().filter(i => i.q !== query);
-  h.unshift({ q: query, ts: new Date().toISOString() });
-  if (h.length > HISTORY_MAX) h = h.slice(0, HISTORY_MAX);
-  localStorage.setItem(historyKey(), JSON.stringify(h));
-  localStorage.setItem(`admin_last_query_${currentApp}`, query);
+// ─── Utilidades ────────────────────────────────────────────────────────────
+function historyKey(){return`admin_recent_${currentApp}`;}
+function getHistory(){try{return JSON.parse(localStorage.getItem(historyKey())||"[]");}catch{return[];}}
+function saveToHistory(query){
+  let h=getHistory().filter(i=>i.q!==query);
+  h.unshift({q:query,ts:new Date().toISOString()});
+  if(h.length>HISTORY_MAX)h=h.slice(0,HISTORY_MAX);
+  localStorage.setItem(historyKey(),JSON.stringify(h));
+  localStorage.setItem(`admin_last_query_${currentApp}`,query);
   renderHistory();
 }
-function renderHistory() {
-  const h = getHistory();
-  $("historyCount").textContent = h.length;
-  const list = $("recentList"); list.innerHTML = "";
-  if (!h.length) { list.innerHTML = `<div style="font-size:12px;color:var(--muted)">Sin búsquedas recientes</div>`; return; }
-  h.forEach(item => {
-    const btn = document.createElement("button");
-    btn.className = "recent-chip";
-    btn.innerHTML = `<span class="rc-id">${esc(item.q.length>22?item.q.slice(0,22)+"…":item.q)}</span><span class="rc-date">${fmtAgo(item.ts)}</span>`;
-    btn.onclick = () => { $("q").value = item.q; $("recentPanel").style.display = "none"; loadUser(); };
+function renderHistory(){
+  const h=getHistory();
+  $("historyCount").textContent=h.length;
+  const list=$("recentList");list.innerHTML="";
+  if(!h.length){list.innerHTML=`<div style="font-size:12px;color:var(--muted)">Sin búsquedas recientes</div>`;return;}
+  h.forEach(item=>{
+    const btn=document.createElement("button");
+    btn.className="recent-chip";
+    btn.innerHTML=`<span class="rc-id">${esc(item.q.length>22?item.q.slice(0,22)+"…":item.q)}</span><span class="rc-date">${fmtAgo(item.ts)}</span>`;
+    btn.onclick=()=>{$("q").value=item.q;$("recentPanel").style.display="none";loadUser();};
     list.appendChild(btn);
   });
 }
-function fmtAgo(iso) {
-  const d = Math.floor((Date.now()-new Date(iso).getTime())/1000);
-  if(d<60) return "ahora mismo"; if(d<3600) return `hace ${Math.floor(d/60)} min`;
-  if(d<86400) return `hace ${Math.floor(d/3600)} h`; return `hace ${Math.floor(d/86400)} d`;
-}
-function setStatus(s,t) { $("sdot").className="sdot "+s; $("stext").textContent=t; }
-function toast(msg, kind="info", ttl=3500) {
-  const el = document.createElement("div");
-  el.className = "toast-item "+(kind==="ok"?"ok":kind==="err"?"err":"");
-  el.innerHTML = `<span style="font-size:15px">${kind==="ok"?"✅":kind==="err"?"❌":"ℹ️"}</span><div class="toast-msg">${esc(msg)}</div><button class="toast-close" onclick="this.closest('.toast-item').remove()">✕</button>`;
+function fmtAgo(iso){const d=Math.floor((Date.now()-new Date(iso).getTime())/1000);if(d<60)return"ahora mismo";if(d<3600)return`hace ${Math.floor(d/60)} min`;if(d<86400)return`hace ${Math.floor(d/3600)} h`;return`hace ${Math.floor(d/86400)} d`;}
+function setStatus(s,t){$("sdot").className="sdot "+s;$("stext").textContent=t;}
+function toast(msg,kind="info",ttl=3500){
+  const el=document.createElement("div");
+  el.className="toast-item "+(kind==="ok"?"ok":kind==="err"?"err":"");
+  el.innerHTML=`<span style="font-size:15px">${kind==="ok"?"✅":kind==="err"?"❌":"ℹ️"}</span><div class="toast-msg">${esc(msg)}</div><button class="toast-close" onclick="this.closest('.toast-item').remove()">✕</button>`;
   $("toastHost").appendChild(el);
-  setTimeout(()=>el.isConnected&&el.remove(), ttl);
+  setTimeout(()=>el.isConnected&&el.remove(),ttl);
 }
-function esc(s) { return String(s||"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
-function fmt(n) { if(n===null||n===undefined||Number.isNaN(Number(n))) return "—"; return new Intl.NumberFormat("es-ES").format(Number(n)); }
-function fmtDate(s) { if(!s) return "—"; return String(s).replace("T"," ").slice(0,16); }
-function stateBadge(state) {
-  const s = String(state||"").toUpperCase();
-  if(s.includes("VALID")||s.includes("PURCHASED")||s==="1"||s==="OK") return `<span class="badge ok">✓ OK</span>`;
-  if(s.includes("PENDING")) return `<span class="badge warn">PENDING</span>`;
-  return `<span class="badge bad">${esc(state||"—")}</span>`;
-}
+function esc(s){return String(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+function fmt(n){if(n===null||n===undefined||Number.isNaN(Number(n)))return"—";return new Intl.NumberFormat("es-ES").format(Number(n));}
+function fmtDate(s){if(!s)return"—";return String(s).replace("T"," ").slice(0,16);}
+function stateBadge(state){const s=String(state||"").toUpperCase();if(s.includes("VALID")||s.includes("PURCHASED")||s==="1"||s==="OK")return`<span class="badge ok">✓ OK</span>`;if(s.includes("PENDING"))return`<span class="badge warn">PENDING</span>`;return`<span class="badge bad">${esc(state||"—")}</span>`;}
+function getCurrentConfig(){return APPS[currentApp];}
 
-function getCurrentConfig() { return APPS[currentApp]; }
-
-function setApp(appKey) {
-  currentApp = appKey;
-  localStorage.setItem("admin_current_app", currentApp);
-  const cfg = getCurrentConfig();
-  $("navAppTitle").textContent = cfg.navTitle;
-  $("navAppSub").textContent = cfg.navSub;
-  $("searchCardTitle").textContent = cfg.searchTitle;
-  $("q").placeholder = cfg.searchPlaceholder;
-  $("searchHintText").innerHTML = cfg.searchHint;
-  $("quotaCardTitle").textContent = cfg.quotaTitle;
-  $("availLabel").textContent = cfg.availLabel;
-  $("kpiTotalLabel").textContent = cfg.totalLabel;
-  $("kpiUsedLabel").textContent = cfg.usedLabel;
-  $("kpiRemLabel").textContent = cfg.remLabel;
-  $("primaryIdLabel").textContent = cfg.primaryIdLabel + " ";
-  $("secondaryIdLabel").textContent = cfg.secondaryIdLabel + " ";
-  $("adjustLabel").textContent = cfg.adjustLabel;
-  $("buyersTitle").textContent = cfg.buyersTitle;
-  $("purchasesCardTitle").textContent = cfg.purchasesCardTitle;
-  $("adminLogsTitle").textContent = cfg.adminLogsTitle;
-  $("resetUserBtn").textContent = cfg.resetLabel;
-  $("buyersTabBtn").style.display = cfg.buyersVisible ? "" : "none";
-  $("purchasesCard").style.display = cfg.purchasesVisible ? "" : "none";
-  $("reconcileBtn").style.display = cfg.reconcileVisible ? "" : "none";
-  $("appGestionProBtn").classList.toggle("active", currentApp === "gestionpro");
-  $("appActivateBtn").classList.toggle("active", currentApp === "activate");
+// ─── setApp ────────────────────────────────────────────────────────────────
+function setApp(appKey){
+  currentApp=appKey;
+  localStorage.setItem("admin_current_app",currentApp);
+  const cfg=getCurrentConfig();
+  $("navAppTitle").textContent=cfg.navTitle;
+  $("navAppSub").textContent=cfg.navSub;
+  $("searchCardTitle").textContent=cfg.searchTitle;
+  $("q").placeholder=cfg.searchPlaceholder;
+  $("searchHintText").innerHTML=cfg.searchHint;
+  $("quotaCardTitle").textContent=cfg.quotaTitle;
+  $("availLabel").textContent=cfg.availLabel;
+  $("kpiTotalLabel").textContent=cfg.totalLabel;
+  $("kpiUsedLabel").textContent=cfg.usedLabel;
+  $("kpiRemLabel").textContent=cfg.remLabel;
+  $("primaryIdLabel").textContent=cfg.primaryIdLabel+" ";
+  $("secondaryIdLabel").textContent=cfg.secondaryIdLabel+" ";
+  $("adjustLabel").textContent=cfg.adjustLabel;
+  $("buyersTitle").textContent=cfg.buyersTitle;
+  $("purchasesCardTitle").textContent=cfg.purchasesCardTitle;
+  $("adminLogsTitle").textContent=cfg.adminLogsTitle;
+  $("resetUserBtn").textContent=cfg.resetLabel;
+  $("buyersTabBtn").style.display=cfg.buyersVisible?"":"none";
+  $("purchasesCard").style.display=cfg.purchasesVisible?"":"none";
+  $("reconcileBtn").style.display=cfg.reconcileVisible?"":"none";
+  $("appGestionProBtn").classList.toggle("active",currentApp==="gestionpro");
+  $("appActivateBtn").classList.toggle("active",currentApp==="activate");
   renderAdjustButtons();
   clearUser();
   renderHistory();
   setStatus("ok","Listo");
 }
-
-function renderAdjustButtons() {
-  const vals = getCurrentConfig().adjustButtons;
-  document.querySelectorAll(".adjust-btn").forEach((btn, idx) => {
-    const val = vals[idx];
-    if (val == null) { btn.style.display = "none"; return; }
-    btn.style.display = "";
-    btn.dataset.add = String(val);
-    btn.textContent = val > 0 ? `+${val}` : `−${Math.abs(val)}`;
-    btn.classList.toggle("ok-btn", val > 0);
-    btn.classList.toggle("danger-btn", val < 0);
+function renderAdjustButtons(){
+  const vals=getCurrentConfig().adjustButtons;
+  document.querySelectorAll(".adjust-btn").forEach((btn,idx)=>{
+    const val=vals[idx];
+    if(val==null){btn.style.display="none";return;}
+    btn.style.display="";btn.dataset.add=String(val);
+    btn.textContent=val>0?`+${val}`:`−${Math.abs(val)}`;
+    btn.classList.toggle("ok-btn",val>0);btn.classList.toggle("danger-btn",val<0);
   });
 }
 
+// ─── clearUser / renderUser ────────────────────────────────────────────────
+function clearUser(){
+  currentPrimaryId=null;currentSupportId=null;
+  ["kTotal","kUsed","kRem","kAvail","quotaMeta","deviceId","supportId","who","pCount","lCount","actionInfo"].forEach(id=>$(id).textContent="—");
+  $("purchasesTbody").innerHTML=`<tr><td colspan="5" class="empty">—</td></tr>`;
+  $("logsTbody").innerHTML=`<tr><td colspan="5" class="empty">—</td></tr>`;
+  $("calcBox").style.display="none";$("userGrid").style.display="none";$("searchHint").style.display="";
+}
+function renderUser(raw){
+  const d=getCurrentConfig().mapUserData(raw);
+  currentPrimaryId=d.primaryId||null;currentSupportId=d.supportId||null;
+  $("userGrid").style.display="";$("searchHint").style.display="none";
+  $("deviceId").textContent=currentPrimaryId||"—";
+  $("supportId").textContent=currentSupportId||"—";
+  $("who").textContent=currentPrimaryId?String(currentPrimaryId).slice(0,14)+"…":"—";
+  const q=d.quota||{};
+  $("kTotal").textContent=fmt(q.total);$("kUsed").textContent=fmt(q.used);
+  $("kRem").textContent=fmt(q.remaining);$("kAvail").textContent=fmt(Math.max(0,Number(q.remaining??0)));
+  $("quotaMeta").textContent=d.updatedAt?fmtDate(d.updatedAt):"—";
+  const purchases=Array.isArray(d.purchases)?d.purchases:[];
+  $("pCount").textContent=purchases.length+" items";
+  $("purchasesTbody").innerHTML=purchases.length===0
+    ?`<tr><td colspan="5" class="empty">${esc(getCurrentConfig().emptyPurchasesText)}</td></tr>`
+    :purchases.map(p=>`<tr><td class="mono">${esc(fmtDate(p.created_at))}</td><td><span class="badge blue">${esc(p.product_id||p.label||"—")}</span></td><td>${stateBadge(p.purchase_state||p.state)}</td><td style="font-weight:700">${fmt(p.credits_added??p.amount)}</td><td class="mono">${esc(p.purchase_token_masked||p.reference||"—")}</td></tr>`).join("");
+  const logs=Array.isArray(d.logs)?d.logs:[];
+  $("lCount").textContent=logs.length+" items";
+  $("logsTbody").innerHTML=logs.length===0
+    ?`<tr><td colspan="5" class="empty">Sin logs</td></tr>`
+    :logs.map(l=>`<tr><td class="mono">${esc(fmtDate(l.created_at))}</td><td class="mono">${esc(l.admin_email||l.admin||"—")}</td><td><span class="badge">${esc(l.action||"—")}</span></td><td style="font-weight:700;color:${Number(l.delta_credits||l.delta_tokens)>0?"var(--ok)":Number(l.delta_credits||l.delta_tokens)<0?"var(--danger)":"var(--muted)"}">${Number(l.delta_credits||l.delta_tokens)>0?"+":""}${fmt(l.delta_credits??l.delta_tokens??0)}</td><td style="color:var(--muted2)">${esc(l.note||"")}</td></tr>`).join("");
+}
+
+// ─── Acciones ──────────────────────────────────────────────────────────────
+async function loadUser(){
+  const q=$("q").value.trim();
+  if(!q){toast(getCurrentConfig().searchToast);return;}
+  clearUser();setStatus("busy","Cargando...");
+  try{
+    const cfg=getCurrentConfig();
+    const{r,data}=await workerFetch(cfg.worker,cfg.routeUser,{search:`?query=${encodeURIComponent(q)}`});
+    if(r.status===401){setStatus("err","No autorizado");toast("Contraseña incorrecta","err",6000);return;}
+    if(!data?.ok){setStatus("err","Error");toast((data?.error||`HTTP ${r.status}`)+(data?.detail?" — "+data.detail:""),"err",7000);return;}
+    saveToHistory(q);renderUser(data);setStatus("ok","OK");$("actionInfo").textContent="Listo";
+  }catch(e){setStatus("err","Error de red");toast(e.message,"err");}
+}
+async function addCredits(amount){
+  if(!currentPrimaryId){toast("Busca un usuario primero");return;}
+  const credits=Number(amount);
+  if(!Number.isFinite(credits)||credits===0){toast("Cantidad inválida");return;}
+  if(!confirm(`¿${credits>0?"Añadir":"Quitar"} ${Math.abs(credits)} ${currentApp==="activate"?"tokens":"créditos"}?`))return;
+  setStatus("busy","Guardando...");
+  const cfg=getCurrentConfig();
+  const{r,data}=await workerFetch(cfg.worker,cfg.routeAdjust,{method:"POST",body:cfg.buildAdjustBody(currentPrimaryId,currentSupportId,credits,$("note").value.trim())});
+  if(!data?.ok){setStatus("err","Error");toast(data?.error||`HTTP ${r.status}`,"err");return;}
+  toast(credits>0?cfg.adjustSuccessAdd:cfg.adjustSuccessRemove,"ok");
+  await loadUser();setStatus("ok","OK");
+}
+async function reconcile(){
+  if(!currentPrimaryId||!getCurrentConfig().reconcileVisible)return;
+  if(!confirm("¿Reconciliar?"))return;
+  setStatus("busy","Reconciliando...");
+  const cfg=getCurrentConfig();
+  const{r,data}=await workerFetch(cfg.worker,cfg.routeReconcile,{method:"POST",body:cfg.buildReconcileBody(currentPrimaryId,currentSupportId,$("note").value.trim())});
+  if(!data?.ok){setStatus("err","Error");toast(data?.error||`HTTP ${r.status}`,"err");return;}
+  if(data.detail){$("calcBox").style.display="";$("calcBox").innerHTML=`<div class="info-box" style="font-size:11px"><b>Reconciliación</b>: quotaFree=${esc(data.detail.quotaFree)} · sumPurchases=${esc(data.detail.sumPurchases)} · newTotal=${esc(data.detail.newTotal)}</div>`;}
+  toast("Reconciliado","ok");await loadUser();setStatus("ok","OK");
+}
+async function resetUser(){
+  if(!currentPrimaryId)return;
+  if(!confirm(getCurrentConfig().resetConfirm))return;
+  setStatus("busy","Reseteando...");
+  const cfg=getCurrentConfig();
+  const{r,data}=await workerFetch(cfg.worker,cfg.routeReset,{method:"POST",body:cfg.buildResetBody(currentPrimaryId,currentSupportId,$("note").value.trim())});
+  if(!data?.ok){setStatus("err","Error");toast(data?.error||`HTTP ${r.status}`,"err");return;}
+  toast(currentApp==="activate"?"Usuario reseteado":"Usuario reseteado a 5","ok");
+  await loadUser();setStatus("ok","OK");
+}
+async function loadBuyers(reset=false){
+  if(!getCurrentConfig().buyersVisible){$("buyersList").innerHTML=`<div class="empty">${esc(getCurrentConfig().noBuyersText)}</div>`;$("buyersPill").textContent="—";return;}
+  if(reset){buyersCursor=0;$("buyersList").innerHTML="";}
+  $("buyersPill").textContent="…";setStatus("busy","Cargando...");
+  const cfg=getCurrentConfig();
+  const{r,data}=await workerFetch(cfg.worker,cfg.routeBuyers,{search:`?limit=60&cursor=${buyersCursor}`});
+  if(!data?.ok){setStatus("err","Error");toast(data?.error||`HTTP ${r.status}`,"err");return;}
+  const items=data.items||[];
+  if(!items.length&&!buyersCursor){$("buyersList").innerHTML=`<div class="empty">${esc(cfg.noBuyersText)}</div>`;$("buyersPill").textContent="0";setStatus("ok","Listo");return;}
+  items.forEach(it=>{const c=document.createElement("button");c.className="buyer-chip";c.textContent=it.deviceId||it.installId||it.id;c.onclick=()=>{$("q").value=it.deviceId||it.installId||it.id;document.querySelector("[data-tab='users']").click();loadUser();window.scrollTo({top:0,behavior:"smooth"});};$("buyersList").appendChild(c);});
+  $("buyersPill").textContent=String($("buyersList").children.length);
+  $("moreBuyersBtn").style.display=data.nextCursor!=null?"":"none";
+  if(data.nextCursor!=null)buyersCursor=data.nextCursor;
+  setStatus("ok","Listo");
+}
+async function loadApiLogs(){
+  setStatus("busy","Cargando logs...");
+  $("apiLogsTbody").innerHTML=`<tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr>`;
+  const dev=$("logsDeviceFilter").value.trim();
+  const blocked=$("logsBlockedFilter").value;
+  const limit=$("logsLimitFilter").value;
+  let qs=`?limit=${limit}`;
+  if(dev)qs+=`&deviceId=${encodeURIComponent(dev)}`;
+  if(blocked)qs+=`&blocked=${blocked}`;
+  const cfg=getCurrentConfig();
+  const{r,data}=await workerFetch(cfg.worker,cfg.routeApiLogs,{search:qs});
+  if(!data?.ok){setStatus("err","Error");$("apiLogsTbody").innerHTML=`<tr><td colspan="5" class="empty">Error: ${esc(data?.error||r.status)}</td></tr>`;toast(data?.error||`HTTP ${r.status}`,"err");return;}
+  const logs=data.logs||[];
+  $("logApiCount").textContent=logs.length+" registros";
+  const bl=logs.filter(l=>l.blocked==1).length;
+  $("logKpiTotal").textContent=fmt(logs.length);$("logKpiOk").textContent=fmt(logs.length-bl);$("logKpiBlocked").textContent=fmt(bl);
+  $("apiLogsTbody").innerHTML=logs.length===0
+    ?`<tr><td colspan="5" class="empty">Sin registros</td></tr>`
+    :logs.map(l=>`<tr class="${l.blocked==1?'log-blocked':''}"><td class="mono">${esc(fmtDate(l.created_at))}</td><td class="mono">${esc(((l.device_id||l.install_id||"—")).slice(0,16))}…</td><td class="mono">${esc(l.ip||"—")}</td><td><span class="badge blue">${esc((l.endpoint||"—").replace("/api/gemini/",""))}</span></td><td>${l.blocked==1?`<span class="badge bad">🚫 Bloqueado</span>`:`<span class="badge ok">✓ OK</span>`}</td></tr>`).join("");
+  setStatus("ok","Listo");
+}
+
+// ─── Event listeners ───────────────────────────────────────────────────────
+$("loginBtn").onclick = doLogin;
+$("loginPass").addEventListener("keydown", e => e.key==="Enter" && doLogin());
+$("logoutBtn").onclick = () => { SECRET=""; sessionStorage.removeItem("admin_secret"); $("app").style.display="none"; $("loginScreen").style.display=""; $("loginPass").value=""; $("loginBtn").disabled=false; };
 $("appGestionProBtn").onclick = () => setApp("gestionpro");
 $("appActivateBtn").onclick   = () => setApp("activate");
-
+$("historyBtn").onclick = () => { const p=$("recentPanel"); p.style.display=p.style.display==="none"?"":"none"; };
+document.addEventListener("click", e => { if(!$("recentPanel").contains(e.target)&&e.target!==$("historyBtn")&&!$("historyBtn").contains(e.target)) $("recentPanel").style.display="none"; });
 document.querySelectorAll(".tab[data-tab]").forEach(btn => {
   btn.onclick = () => {
-    if (btn.id === "buyersTabBtn" && !getCurrentConfig().buyersVisible) return;
+    if(btn.id==="buyersTabBtn"&&!getCurrentConfig().buyersVisible)return;
     document.querySelectorAll(".tab[data-tab]").forEach(b=>b.classList.remove("active"));
     document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
-    btn.classList.add("active");
-    $("tab-"+btn.dataset.tab).classList.add("active");
+    btn.classList.add("active"); $("tab-"+btn.dataset.tab).classList.add("active");
   };
 });
-
-$("historyBtn").onclick = () => {
-  const p = $("recentPanel"); p.style.display = p.style.display === "none" ? "" : "none";
-};
-document.addEventListener("click", e => {
-  if (!$("recentPanel").contains(e.target) && e.target !== $("historyBtn") && !$("historyBtn").contains(e.target))
-    $("recentPanel").style.display = "none";
-});
-
-function clearUser() {
-  currentPrimaryId = null; currentSupportId = null;
-  ["kTotal","kUsed","kRem","kAvail","quotaMeta","deviceId","supportId","who","pCount","lCount","actionInfo"].forEach(id=>$(id).textContent="—");
-  $("purchasesTbody").innerHTML = `<tr><td colspan="5" class="empty">—</td></tr>`;
-  $("logsTbody").innerHTML = `<tr><td colspan="5" class="empty">—</td></tr>`;
-  $("calcBox").style.display = "none";
-  $("userGrid").style.display = "none";
-  $("searchHint").style.display = "";
-}
-
-function renderUser(raw) {
-  const d = getCurrentConfig().mapUserData(raw);
-  currentPrimaryId = d.primaryId||null; currentSupportId = d.supportId||null;
-  $("userGrid").style.display = ""; $("searchHint").style.display = "none";
-  $("deviceId").textContent = currentPrimaryId||"—";
-  $("supportId").textContent = currentSupportId||"—";
-  $("who").textContent = currentPrimaryId ? String(currentPrimaryId).slice(0,14)+"…" : "—";
-  const q = d.quota||{};
-  $("kTotal").textContent = fmt(q.total);
-  $("kUsed").textContent  = fmt(q.used);
-  $("kRem").textContent   = fmt(q.remaining);
-  $("kAvail").textContent = fmt(Math.max(0, Number(q.remaining??0)));
-  $("quotaMeta").textContent = d.updatedAt ? fmtDate(d.updatedAt) : "—";
-
-  const purchases = Array.isArray(d.purchases) ? d.purchases : [];
-  $("pCount").textContent = purchases.length + " items";
-  $("purchasesTbody").innerHTML = purchases.length === 0
-    ? `<tr><td colspan="5" class="empty">${esc(getCurrentConfig().emptyPurchasesText)}</td></tr>`
-    : purchases.map(p=>`<tr>
-        <td class="mono">${esc(fmtDate(p.created_at))}</td>
-        <td><span class="badge blue">${esc(p.product_id||p.label||"—")}</span></td>
-        <td>${stateBadge(p.purchase_state||p.state)}</td>
-        <td style="font-weight:700">${fmt(p.credits_added??p.amount)}</td>
-        <td class="mono">${esc(p.purchase_token_masked||p.reference||"—")}</td>
-      </tr>`).join("");
-
-  const logs = Array.isArray(d.logs) ? d.logs : [];
-  $("lCount").textContent = logs.length + " items";
-  $("logsTbody").innerHTML = logs.length === 0
-    ? `<tr><td colspan="5" class="empty">Sin logs</td></tr>`
-    : logs.map(l=>`<tr>
-        <td class="mono">${esc(fmtDate(l.created_at))}</td>
-        <td class="mono">${esc(l.admin_email||l.admin||"—")}</td>
-        <td><span class="badge">${esc(l.action||"—")}</span></td>
-        <td style="font-weight:700;color:${Number(l.delta_credits||l.delta_tokens)>0?"var(--ok)":Number(l.delta_credits||l.delta_tokens)<0?"var(--danger)":"var(--muted)"}">${Number(l.delta_credits||l.delta_tokens)>0?"+":""}${fmt(l.delta_credits??l.delta_tokens??0)}</td>
-        <td style="color:var(--muted2)">${esc(l.note||"")}</td>
-      </tr>`).join("");
-}
-
-async function loadUser() {
-  const q = $("q").value.trim();
-  if (!q) { toast(getCurrentConfig().searchToast); return; }
-  clearUser(); setStatus("busy","Cargando...");
-  try {
-    const cfg = getCurrentConfig();
-    const { r, data } = await workerFetch(cfg.worker, cfg.routeUser, { search: `?query=${encodeURIComponent(q)}` });
-    if (r.status === 401) { setStatus("err","No autorizado"); toast("Contraseña incorrecta — vuelve a hacer login","err",6000); return; }
-    if (!data?.ok) { setStatus("err","Error"); toast((data?.error||`HTTP ${r.status}`)+(data?.detail?" — "+data.detail:""),"err",7000); return; }
-    saveToHistory(q);
-    renderUser(data); setStatus("ok","OK"); $("actionInfo").textContent = "Listo";
-  } catch(e) { setStatus("err","Error de red"); toast(e.message,"err"); }
-}
-
-async function addCredits(amount) {
-  if (!currentPrimaryId) { toast("Busca un usuario primero"); return; }
-  const credits = Number(amount);
-  if (!Number.isFinite(credits)||credits===0) { toast("Cantidad inválida"); return; }
-  if (!confirm(`¿${credits>0?"Añadir":"Quitar"} ${Math.abs(credits)} ${currentApp==="activate"?"tokens":"créditos"}?`)) return;
-  setStatus("busy","Guardando...");
-  const cfg = getCurrentConfig();
-  const body = cfg.buildAdjustBody(currentPrimaryId, currentSupportId, credits, $("note").value.trim());
-  const { r, data } = await workerFetch(cfg.worker, cfg.routeAdjust, { method:"POST", body });
-  if (!data?.ok) { setStatus("err","Error"); toast(data?.error||`HTTP ${r.status}`,"err"); return; }
-  toast(credits>0?cfg.adjustSuccessAdd:cfg.adjustSuccessRemove,"ok");
-  await loadUser(); setStatus("ok","OK");
-}
-
-async function reconcile() {
-  if (!currentPrimaryId) { toast("Busca un usuario primero"); return; }
-  if (!getCurrentConfig().reconcileVisible) return;
-  if (!confirm("¿Reconciliar?")) return;
-  setStatus("busy","Reconciliando...");
-  const cfg = getCurrentConfig();
-  const body = cfg.buildReconcileBody(currentPrimaryId, currentSupportId, $("note").value.trim());
-  const { r, data } = await workerFetch(cfg.worker, cfg.routeReconcile, { method:"POST", body });
-  if (!data?.ok) { setStatus("err","Error"); toast(data?.error||`HTTP ${r.status}`,"err"); return; }
-  if (data.detail) { $("calcBox").style.display=""; $("calcBox").innerHTML=`<div class="info-box" style="font-size:11px"><b>Reconciliación</b>: quotaFree=${esc(data.detail.quotaFree)} · sumPurchases=${esc(data.detail.sumPurchases)} · newTotal=${esc(data.detail.newTotal)}</div>`; }
-  toast("Reconciliado","ok"); await loadUser(); setStatus("ok","OK");
-}
-
-async function resetUser() {
-  if (!currentPrimaryId) { toast("Busca un usuario primero"); return; }
-  if (!confirm(getCurrentConfig().resetConfirm)) return;
-  setStatus("busy","Reseteando...");
-  const cfg = getCurrentConfig();
-  const body = cfg.buildResetBody(currentPrimaryId, currentSupportId, $("note").value.trim());
-  const { r, data } = await workerFetch(cfg.worker, cfg.routeReset, { method:"POST", body });
-  if (!data?.ok) { setStatus("err","Error"); toast(data?.error||`HTTP ${r.status}`,"err"); return; }
-  toast(currentApp==="activate"?"Usuario reseteado":"Usuario reseteado a 5","ok");
-  await loadUser(); setStatus("ok","OK");
-}
-
-async function loadBuyers(reset=false) {
-  if (!getCurrentConfig().buyersVisible) {
-    $("buyersList").innerHTML = `<div class="empty">${esc(getCurrentConfig().noBuyersText)}</div>`;
-    $("buyersPill").textContent = "—"; return;
-  }
-  if (reset) { buyersCursor=0; $("buyersList").innerHTML=""; }
-  $("buyersPill").textContent = "…"; setStatus("busy","Cargando...");
-  const cfg = getCurrentConfig();
-  const { r, data } = await workerFetch(cfg.worker, cfg.routeBuyers, { search:`?limit=60&cursor=${buyersCursor}` });
-  if (!data?.ok) { setStatus("err","Error"); toast(data?.error||`HTTP ${r.status}`,"err"); return; }
-  const items = data.items||[];
-  if (!items.length&&!buyersCursor) { $("buyersList").innerHTML=`<div class="empty">${esc(cfg.noBuyersText)}</div>`; $("buyersPill").textContent="0"; setStatus("ok","Listo"); return; }
-  items.forEach(it => {
-    const c = document.createElement("button");
-    c.className = "buyer-chip"; c.textContent = it.deviceId||it.installId||it.id;
-    c.onclick = () => { $("q").value=it.deviceId||it.installId||it.id; document.querySelector("[data-tab='users']").click(); loadUser(); window.scrollTo({top:0,behavior:"smooth"}); };
-    $("buyersList").appendChild(c);
-  });
-  $("buyersPill").textContent = String($("buyersList").children.length);
-  $("moreBuyersBtn").style.display = data.nextCursor!=null?"":"none";
-  if (data.nextCursor!=null) buyersCursor = data.nextCursor;
-  setStatus("ok","Listo");
-}
-
-async function loadApiLogs() {
-  setStatus("busy","Cargando logs...");
-  $("apiLogsTbody").innerHTML = `<tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr>`;
-  const dev = $("logsDeviceFilter").value.trim();
-  const blocked = $("logsBlockedFilter").value;
-  const limit = $("logsLimitFilter").value;
-  let qs = `?limit=${limit}`;
-  if (dev) qs += `&deviceId=${encodeURIComponent(dev)}`;
-  if (blocked) qs += `&blocked=${blocked}`;
-  const cfg = getCurrentConfig();
-  const { r, data } = await workerFetch(cfg.worker, cfg.routeApiLogs, { search: qs });
-  if (!data?.ok) { setStatus("err","Error"); $("apiLogsTbody").innerHTML=`<tr><td colspan="5" class="empty">Error: ${esc(data?.error||r.status)}</td></tr>`; toast(data?.error||`HTTP ${r.status}`,"err"); return; }
-  const logs = data.logs||[];
-  $("logApiCount").textContent = logs.length+" registros";
-  const bl = logs.filter(l=>l.blocked==1).length;
-  $("logKpiTotal").textContent = fmt(logs.length);
-  $("logKpiOk").textContent    = fmt(logs.length-bl);
-  $("logKpiBlocked").textContent = fmt(bl);
-  $("apiLogsTbody").innerHTML = logs.length===0
-    ? `<tr><td colspan="5" class="empty">Sin registros</td></tr>`
-    : logs.map(l=>`<tr class="${l.blocked==1?'log-blocked':''}">
-        <td class="mono">${esc(fmtDate(l.created_at))}</td>
-        <td class="mono">${esc(((l.device_id||l.install_id||"—")).slice(0,16))}…</td>
-        <td class="mono">${esc(l.ip||"—")}</td>
-        <td><span class="badge blue">${esc((l.endpoint||"—").replace("/api/gemini/",""))}</span></td>
-        <td>${l.blocked==1?`<span class="badge bad">🚫 Bloqueado</span>`:`<span class="badge ok">✓ OK</span>`}</td>
-      </tr>`).join("");
-  setStatus("ok","Listo");
-}
-
-// Auto-login si hay sesión activa
-const savedSecret = sessionStorage.getItem("admin_secret");
-if (savedSecret) { SECRET = savedSecret; showApp(); }
-
 $("searchBtn").onclick = loadUser;
 $("q").addEventListener("keydown", e => e.key==="Enter" && loadUser());
 document.querySelectorAll(".adjust-btn").forEach(b => b.onclick=()=>addCredits(b.dataset.add));
-$("applyBtn").onclick  = () => { const v=$("customCredits").value.trim(); if(!v){toast("Pon una cantidad");return;} addCredits(v); };
+$("applyBtn").onclick = () => { const v=$("customCredits").value.trim(); if(!v){toast("Pon una cantidad");return;} addCredits(v); };
 $("reconcileBtn").onclick = reconcile;
 $("resetUserBtn").onclick = resetUser;
 $("loadBuyersBtn").onclick = () => loadBuyers(true);
@@ -794,6 +701,11 @@ $("moreBuyersBtn").onclick = () => loadBuyers(false);
 $("refreshLogsBtn").onclick = loadApiLogs;
 $("applyLogsFilter").onclick = loadApiLogs;
 document.querySelector("[data-tab='logs']").addEventListener("click", () => { if($("logApiCount").textContent==="—") loadApiLogs(); });
+
+// ─── Auto-login si hay sesión activa ───────────────────────────────────────
+const savedSecret = sessionStorage.getItem("admin_secret");
+if (savedSecret) { SECRET = savedSecret; showApp(); }
 </script>
 </body>
 </html>
+
