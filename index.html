@@ -480,12 +480,12 @@
       adjustSuccessAdd: "Créditos añadidos",
       adjustSuccessRemove: "Créditos quitados",
       addPayloadField: "credits",
-      routeUser: "/api/gp/admin/user",
-      routeAdjust: "/api/gp/admin/add-credits",
-      routeReconcile: "/api/gp/admin/reconcile",
-      routeReset: "/api/gp/admin/reset-user",
-      routeBuyers: "/api/gp/admin/purchasers",
-      routeApiLogs: "/api/gp/admin/api-logs",
+      routeUser: "/api/admin/user",
+      routeAdjust: "/api/admin/add-credits",
+      routeReconcile: "/api/admin/reconcile",
+      routeReset: "/api/admin/reset-user",
+      routeBuyers: "/api/admin/purchasers",
+      routeApiLogs: "/api/admin/api-logs",
       adjustButtons: [10,30,70,-10,-30,-70],
       mapUserData(data){
         const quota = data.quota || {};
@@ -541,12 +541,12 @@
       adjustSuccessAdd: "Tokens añadidos",
       adjustSuccessRemove: "Tokens quitados",
       addPayloadField: "amount",
-      routeUser: "/api/activate/admin/user",
-      routeAdjust: "/api/activate/admin/add-tokens",
-      routeReconcile: "/api/activate/admin/reconcile",
-      routeReset: "/api/activate/admin/reset-user",
-      routeBuyers: "/api/activate/admin/purchasers",
-      routeApiLogs: "/api/activate/admin/api-logs",
+      routeUser: "/api/activate/user",
+      routeAdjust: "/api/activate/add-tokens",
+      routeReconcile: "/api/activate/reconcile",
+      routeReset: "/api/activate/reset-user",
+      routeBuyers: "/api/activate/purchasers",
+      routeApiLogs: "/api/activate/api-logs",
       adjustButtons: [10,25,null,-10,-25,null],
       mapUserData(data){
         const quota = data.quota || data.balance || {};
@@ -585,6 +585,7 @@
     h.unshift({ q: query, ts: new Date().toISOString() });
     if (h.length > HISTORY_MAX) h = h.slice(0, HISTORY_MAX);
     localStorage.setItem(historyKey(), JSON.stringify(h));
+    localStorage.setItem(`admin_last_query_${currentApp}`, query);
     renderHistory();
   }
   function renderHistory() {
@@ -876,6 +877,11 @@
   setApp(currentApp);
   renderHistory();
   clearUser();
+  const bootLastQuery = localStorage.getItem(`admin_last_query_${currentApp}`) || "";
+  if (bootLastQuery) {
+    $("q").value = bootLastQuery;
+    loadUser();
+  }
 </script>
 </body>
 </html>
