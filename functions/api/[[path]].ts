@@ -12,19 +12,21 @@ export const onRequest: PagesFunction = async (context) => {
   const incomingPath = u.pathname.replace(/^\/api/, "");
 
   const routeTable: Record<string, { methods: Set<string>; worker: "gestionpro" | "activate"; targetPath: string }> = {
-    "/admin/user": { methods: new Set(["GET"]), worker: "gestionpro", targetPath: "/admin/user" },
+    // GestionPro
+    "/admin/user":        { methods: new Set(["GET"]),  worker: "gestionpro", targetPath: "/admin/user" },
     "/admin/add-credits": { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/add-credits" },
-    "/admin/reconcile": { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/reconcile" },
-    "/admin/reset-user": { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/reset-user" },
-    "/admin/purchasers": { methods: new Set(["GET"]), worker: "gestionpro", targetPath: "/admin/purchasers" },
-    "/admin/api-logs": { methods: new Set(["GET"]), worker: "gestionpro", targetPath: "/admin/api-logs" },
+    "/admin/reconcile":   { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/reconcile" },
+    "/admin/reset-user":  { methods: new Set(["POST"]), worker: "gestionpro", targetPath: "/admin/reset-user" },
+    "/admin/purchasers":  { methods: new Set(["GET"]),  worker: "gestionpro", targetPath: "/admin/purchasers" },
+    "/admin/api-logs":    { methods: new Set(["GET"]),  worker: "gestionpro", targetPath: "/admin/api-logs" },
 
-    "/activate/user": { methods: new Set(["GET"]), worker: "activate", targetPath: "/admin/user" },
-    "/activate/add-tokens": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/add-tokens" },
-    "/activate/reconcile": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reconcile" },
-    "/activate/reset-user": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reset-user" },
-    "/activate/purchasers": { methods: new Set(["GET"]), worker: "activate", targetPath: "/admin/purchasers" },
-    "/activate/api-logs": { methods: new Set(["GET"]), worker: "activate", targetPath: "/admin/api-logs" },
+    // Activate
+    "/activate/user":        { methods: new Set(["GET"]),  worker: "activate", targetPath: "/admin/user" },
+    "/activate/add-tokens":  { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/add-tokens" },
+    "/activate/reconcile":   { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reconcile" },
+    "/activate/reset-user":  { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reset-user" },
+    "/activate/purchasers":  { methods: new Set(["GET"]),  worker: "activate", targetPath: "/admin/purchasers" },
+    "/activate/api-logs":    { methods: new Set(["GET"]),  worker: "activate", targetPath: "/admin/api-logs" },
   };
 
   const matched = routeTable[incomingPath];
@@ -61,8 +63,9 @@ export const onRequest: PagesFunction = async (context) => {
 
 async function fetchIdentityFromAccess(request: Request) {
   const cookie = request.headers.get("cookie") || "";
-  const u = new URL(request.url);
-  const identityUrl = `${u.origin}/cdn-cgi/access/get-identity`;
+
+  // Hardcodeamos el dominio para evitar que u.origin devuelva una URL interna
+  const identityUrl = "https://gestionpro-admin.pages.dev/cdn-cgi/access/get-identity";
 
   const r = await fetch(identityUrl, {
     headers: {
@@ -93,4 +96,5 @@ async function hmacSha256Hex(secret: string, message: string) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
 
