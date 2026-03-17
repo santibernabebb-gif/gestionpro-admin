@@ -2,45 +2,123 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>GestionPro Admin</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
 
 <style>
-body{font-family:Arial;background:#f2f2f2;padding:20px}
-.card{background:#fff;padding:20px;border-radius:10px;max-width:600px}
-input,button{padding:8px;margin:5px}
-</style>
 
+body{
+  font-family: Arial, Helvetica, sans-serif;
+  background:#f2f4f7;
+  margin:0;
+}
+
+header{
+  background:#1e3a8a;
+  color:white;
+  padding:12px 20px;
+  font-size:18px;
+}
+
+.container{
+  max-width:900px;
+  margin:20px auto;
+  padding:20px;
+}
+
+.card{
+  background:white;
+  border-radius:8px;
+  padding:20px;
+  box-shadow:0 2px 6px rgba(0,0,0,.1);
+  margin-bottom:20px;
+}
+
+input{
+  padding:8px;
+  width:300px;
+}
+
+button{
+  padding:8px 12px;
+  cursor:pointer;
+}
+
+pre{
+  background:#111;
+  color:#0f0;
+  padding:10px;
+  overflow:auto;
+}
+
+</style>
 </head>
+
 <body>
 
-<h2>GestionPro Admin</h2>
+<header>
+GestionPro Admin
+</header>
+
+<div class="container">
 
 <div class="card">
+
+<h3>Buscar usuario</h3>
 
 <input id="q" placeholder="deviceId o supportId">
 <button onclick="loadUser()">Buscar</button>
 
-<hr>
+</div>
 
-<div id="out"></div>
+<div class="card">
+
+<h3>Resultado</h3>
+
+<pre id="out">—</pre>
 
 </div>
+
+</div>
+
 
 <script>
 
 async function loadUser(){
 
-  const q=document.getElementById("q").value.trim()
+  const q = document.getElementById("q").value.trim()
 
-  if(!q)return
+  if(!q){
+    alert("Pon un deviceId")
+    return
+  }
 
-  const r=await fetch("/api/admin/user?query="+encodeURIComponent(q))
+  try{
 
-  const j=await r.json()
+    const r = await fetch(
+      "/api/admin/user?query=" +
+      encodeURIComponent(q)
+    )
 
-  document.getElementById("out").innerText=
-    JSON.stringify(j,null,2)
+    const t = await r.text()
+
+    try{
+      const j = JSON.parse(t)
+      document.getElementById("out").textContent =
+        JSON.stringify(j,null,2)
+    }
+    catch{
+      document.getElementById("out").textContent = t
+    }
+
+  }
+  catch(e){
+
+    document.getElementById("out").textContent =
+      "ERROR: " + e.message
+
+  }
 
 }
 
