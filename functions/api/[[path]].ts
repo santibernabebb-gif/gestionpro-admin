@@ -1,37 +1,55 @@
 export const onRequest: PagesFunction = async (context) => {
   const { request, env } = context;
-
-  // ── DEBUG: devuelve info de identity sin bloquear ──────────────────────────
   const u = new URL(request.url);
-  if (u.pathname === "/api/debug-identity") {
-    const cookie    = request.headers.get("cookie") || "";
-    const userAgent = request.headers.get("user-agent") || "";
-    const origin    = u.origin;
 
-    let result1: any = null;
-    let err1 = "";
+  // ── DEBUG identity ─────────────────────────────────────────────────────────
+  if (u.pathname === "/api/debug-identity") {
+    const cookie = request.headers.get("cookie") || "";
+    const userAgent = request.headers.get("user-agent") || "";
+    let result: any = null;
     try {
       const r = await fetch("https://gestionpro-admin.pages.dev/cdn-cgi/access/get-identity", {
         headers: { cookie, "user-agent": userAgent },
       });
-      result1 = { status: r.status, body: await r.text() };
-    } catch (e: any) { err1 = String(e); }
+      result = { status: r.status, body: await r.text() };
+    } catch (e: any) { result = { error: String(e) }; }
+    return new Response(JSON.stringify({ origin: u.origin, result }, null, 2), {
+      headers: { "content-type": "application/json" },
+    });
+  }
 
-    let result2: any = null;
-    let err2 = "";
+  // ── DEBUG activate ─────────────────────────────────────────────────────────
+  // Llama directamente al worker de Activate con la firma y muestra la respuesta
+  if (u.pathname === "/api/debug-activate") {
+    const email = "soporte.gestionproapp@gmail.com";
+    const targetPath = "/admin/user";
+    const search = "?query=test-debug-123";
+    const ts = Date.now().toString();
+    const dataToSign = `${ts}:${email}:GET:${targetPath}:${search}`;
+    const sig = await hmacSha256Hex(env.ADMIN_PROXY_SECRET, dataToSign);
+
+    const targetUrl = "https://recetassaludablespro.santibernabebb.workers.dev" + targetPath + search;
+
+    let workerRes: any = null;
     try {
-      const r = await fetch(`${origin}/cdn-cgi/access/get-identity`, {
-        headers: { cookie, "user-agent": userAgent },
+      const r = await fetch(targetUrl, {
+        method: "GET",
+        headers: {
+          "content-type": "application/json",
+          "x-admin-email": email,
+          "x-admin-ts": ts,
+          "x-admin-sig": sig,
+        },
       });
-      result2 = { status: r.status, body: await r.text() };
-    } catch (e: any) { err2 = String(e); }
+      workerRes = { status: r.status, body: await r.text() };
+    } catch (e: any) { workerRes = { error: String(e) }; }
 
     return new Response(JSON.stringify({
-      origin,
-      fixedDomain: result1,
-      fixedDomainErr: err1,
-      requestOrigin: result2,
-      requestOriginErr: err2,
+      dataToSign,
+      sig,
+      secretPresent: !!env.ADMIN_PROXY_SECRET,
+      secretLength: (env.ADMIN_PROXY_SECRET || "").length,
+      workerRes,
     }, null, 2), {
       headers: { "content-type": "application/json" },
     });
@@ -97,7 +115,6 @@ async function fetchIdentityFromAccess(request: Request) {
   const cookie    = request.headers.get("cookie") || "";
   const userAgent = request.headers.get("user-agent") || "";
   const PAGES_ORIGIN = "https://gestionpro-admin.pages.dev";
-
   const tryFetch = async (origin: string) => {
     try {
       const r = await fetch(`${origin}/cdn-cgi/access/get-identity`, {
@@ -105,20 +122,15 @@ async function fetchIdentityFromAccess(request: Request) {
       });
       if (!r.ok) return null;
       return await r.json();
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   };
-
   const fromFixed = await tryFetch(PAGES_ORIGIN);
   if (fromFixed?.email) return fromFixed;
-
   const u = new URL(request.url);
   if (u.origin !== PAGES_ORIGIN) {
     const fromRequest = await tryFetch(u.origin);
     if (fromRequest?.email) return fromRequest;
   }
-
   return null;
 }
 
