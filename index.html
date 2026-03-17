@@ -433,10 +433,6 @@ $("logoutBtn").onclick = () => {
   $("loginBtn").disabled = false;
 };
 
-// Auto-login si hay sesión activa
-const savedSecret = sessionStorage.getItem("admin_secret");
-if (savedSecret) { SECRET = savedSecret; showApp(); }
-
 // ─── Apps ──────────────────────────────────────────────────────────────────
 const APPS = {
   gestionpro: {
@@ -782,6 +778,10 @@ async function loadApiLogs() {
       </tr>`).join("");
   setStatus("ok","Listo");
 }
+
+// Auto-login si hay sesión activa
+const savedSecret = sessionStorage.getItem("admin_secret");
+if (savedSecret) { SECRET = savedSecret; showApp(); }
 
 $("searchBtn").onclick = loadUser;
 $("q").addEventListener("keydown", e => e.key==="Enter" && loadUser());
