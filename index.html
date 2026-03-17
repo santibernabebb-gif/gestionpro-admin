@@ -643,7 +643,7 @@
     return `<span class="badge bad">${esc(state||"—")}</span>`;
   }
   async function apiFetch(path, opts={}) {
-    const r = await fetch(API+path, {credentials:"include", headers:{"Content-Type":"application/json"},...opts});
+    const r = await fetch(API+path, {credentials:"include",headers:{"Content-Type":"application/json"},...opts});
     const txt = await r.text();
     let data; try { data=JSON.parse(txt); } catch { data={ok:false,error:"NON_JSON",raw:txt}; }
     return {r, data};
