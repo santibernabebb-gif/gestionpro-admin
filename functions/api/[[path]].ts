@@ -21,12 +21,12 @@ export const onRequest: PagesFunction = async (context) => {
     "/admin/api-logs":    { methods: new Set(["GET"]),  worker: "gestionpro", targetPath: "/admin/api-logs" },
 
     // Activate
-    "/activate/user":        { methods: new Set(["GET"]),  worker: "activate", targetPath: "/admin/user" },
-    "/activate/add-tokens":  { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/add-tokens" },
-    "/activate/reconcile":   { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reconcile" },
-    "/activate/reset-user":  { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reset-user" },
-    "/activate/purchasers":  { methods: new Set(["GET"]),  worker: "activate", targetPath: "/admin/purchasers" },
-    "/activate/api-logs":    { methods: new Set(["GET"]),  worker: "activate", targetPath: "/admin/api-logs" },
+    "/activate/user":       { methods: new Set(["GET"]),  worker: "activate", targetPath: "/admin/user" },
+    "/activate/add-tokens": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/add-tokens" },
+    "/activate/reconcile":  { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reconcile" },
+    "/activate/reset-user": { methods: new Set(["POST"]), worker: "activate", targetPath: "/admin/reset-user" },
+    "/activate/purchasers": { methods: new Set(["GET"]),  worker: "activate", targetPath: "/admin/purchasers" },
+    "/activate/api-logs":   { methods: new Set(["GET"]),  worker: "activate", targetPath: "/admin/api-logs" },
   };
 
   const matched = routeTable[incomingPath];
@@ -62,24 +62,38 @@ export const onRequest: PagesFunction = async (context) => {
 };
 
 async function fetchIdentityFromAccess(request: Request) {
-  const cookie = request.headers.get("cookie") || "";
+  const cookie    = request.headers.get("cookie") || "";
+  const userAgent = request.headers.get("user-agent") || "";
 
-  // Hardcodeamos el dominio para evitar que u.origin devuelva una URL interna
-  const identityUrl = "https://gestionpro-admin.pages.dev/cdn-cgi/access/get-identity";
+  // Intentamos siempre con el dominio canónico del Pages project.
+  // Cloudflare Access necesita el dominio real — u.origin puede ser
+  // una URL interna cuando la función se ejecuta en el edge.
+  const PAGES_ORIGIN = "https://gestionpro-admin.pages.dev";
 
-  const r = await fetch(identityUrl, {
-    headers: {
-      cookie,
-      "user-agent": request.headers.get("user-agent") || "",
-    },
-  });
+  const tryFetch = async (origin: string) => {
+    try {
+      const r = await fetch(`${origin}/cdn-cgi/access/get-identity`, {
+        headers: { cookie, "user-agent": userAgent },
+      });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch {
+      return null;
+    }
+  };
 
-  if (!r.ok) return null;
-  try {
-    return await r.json();
-  } catch {
-    return null;
+  // 1. Intentar con el dominio fijo (funciona siempre desde el edge)
+  const fromFixed = await tryFetch(PAGES_ORIGIN);
+  if (fromFixed?.email) return fromFixed;
+
+  // 2. Fallback: usar el origin del request (por si cambia el dominio algún día)
+  const u = new URL(request.url);
+  if (u.origin !== PAGES_ORIGIN) {
+    const fromRequest = await tryFetch(u.origin);
+    if (fromRequest?.email) return fromRequest;
   }
+
+  return null;
 }
 
 async function hmacSha256Hex(secret: string, message: string) {
