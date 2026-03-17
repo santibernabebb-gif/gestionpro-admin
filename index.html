@@ -1,128 +1,704 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GestionPro Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --surface2: #f8fafc;
+      --border: #e2e8f0;
+      --border2: #cbd5e1;
+      --text: #0f172a;
+      --muted: #94a3b8;
+      --muted2: #64748b;
+      --accent: #2563eb;
+      --accent2: #0ea5e9;
+      --accent-glow: rgba(37,99,235,.1);
+      --ok: #059669;
+      --ok-dim: #ecfdf5;
+      --ok-border: #a7f3d0;
+      --danger: #dc2626;
+      --danger-dim: #fff1f2;
+      --danger-border: #fecdd3;
+      --warn: #d97706;
+      --warn-dim: #fffbeb;
+      --warn-border: #fde68a;
+      --blue-dim: #eff6ff;
+      --blue-border: #bfdbfe;
+      --mono: 'DM Mono', monospace;
+      --sans: 'Plus Jakarta Sans', sans-serif;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+      --shadow-md: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.05);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 13px;
+      line-height: 1.5;
+    }
 
-<title>GestionPro Admin</title>
+    /* NAV */
+    nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(255,255,255,.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 0 20px; height: 54px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 800; }
+    .nav-logo {
+      width: 32px; height: 32px; border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(37,99,235,.3);
+    }
+    .nav-sub { font-size: 11px; color: var(--muted2); font-weight: 500; margin-top: 1px; }
+    .nav-right { display: flex; align-items: center; gap: 8px; }
 
-<style>
+    /* TABS */
+    .tabs { display: flex; gap: 2px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+    .tab { padding: 5px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: var(--muted2); transition: all .12s; font-family: var(--sans); }
+    .tab.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+    .tab:hover:not(.active) { color: var(--text); }
 
-body{
-  font-family: Arial, Helvetica, sans-serif;
-  background:#f2f4f7;
-  margin:0;
-}
+    /* STATUS PILL */
+    .spill { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--muted2); padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 999px; }
+    .sdot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+    .sdot.ok { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-dim); }
+    .sdot.busy { background: var(--warn); animation: pulse 1s ease infinite; }
+    .sdot.err { background: var(--danger); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
 
-header{
-  background:#1e3a8a;
-  color:white;
-  padding:12px 20px;
-  font-size:18px;
-}
+    /* LAYOUT */
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .stack { display: flex; flex-direction: column; gap: 14px; }
 
-.container{
-  max-width:900px;
-  margin:20px auto;
-  padding:20px;
-}
+    /* CARD */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .card-head { padding: 13px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface2); }
+    .card-title { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 7px; }
+    .cicon { width: 24px; height: 24px; border-radius: 6px; background: var(--blue-dim); border: 1px solid var(--blue-border); display: flex; align-items: center; justify-content: center; font-size: 12px; }
+    .card-body { padding: 16px; }
 
-.card{
-  background:white;
-  border-radius:8px;
-  padding:20px;
-  box-shadow:0 2px 6px rgba(0,0,0,.1);
-  margin-bottom:20px;
-}
+    /* GRID */
+    .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .span2 { grid-column: 1 / -1; }
+    @media (max-width: 860px) { .g2,.g3 { grid-template-columns: 1fr; } .span2 { grid-column: 1; } }
 
-input{
-  padding:8px;
-  width:300px;
-}
+    /* KPI */
+    .kpi { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+    .kpi-num { font-family: var(--sans); font-size: 30px; font-weight: 800; line-height: 1; letter-spacing: -1.5px; color: var(--text); }
+    .kpi-label { font-size: 11px; font-weight: 600; color: var(--muted2); margin-top: 5px; text-transform: uppercase; letter-spacing: .4px; }
+    .kpi.ok { background: var(--ok-dim); border-color: var(--ok-border); }
+    .kpi.ok .kpi-num { color: var(--ok); }
+    .kpi.danger { background: var(--danger-dim); border-color: var(--danger-border); }
+    .kpi.danger .kpi-num { color: var(--danger); }
+    .kpi.blue .kpi-num { color: var(--accent); }
 
-button{
-  padding:8px 12px;
-  cursor:pointer;
-}
+    /* AVAIL BOX */
+    .avail-box {
+      background: linear-gradient(135deg, #eff6ff, #e0f2fe);
+      border: 2px solid var(--blue-border);
+      border-radius: 10px; padding: 16px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .avail-num { font-family: var(--sans); font-size: 48px; font-weight: 800; color: var(--accent); letter-spacing: -3px; line-height: 1; }
+    .avail-label { font-size: 13px; font-weight: 700; color: var(--accent); }
+    .avail-sub { font-size: 11px; color: var(--muted2); margin-top: 3px; }
 
-pre{
-  background:#111;
-  color:#0f0;
-  padding:10px;
-  overflow:auto;
-}
+    /* FORMS */
+    .input { width: 100%; background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius-sm); padding: 9px 12px; color: var(--text); font-family: var(--sans); font-size: 13px; outline: none; transition: border-color .12s, box-shadow .12s; }
+    .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .input::placeholder { color: var(--muted); }
+    .irow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-</style>
+    /* BUTTONS */
+    .btn { padding: 8px 16px; border-radius: var(--radius-sm); font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border2); background: var(--surface); color: var(--text); transition: all .1s; white-space: nowrap; box-shadow: var(--shadow); }
+    .btn:hover { background: var(--surface2); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; transform: none !important; }
+    .btn.primary { background: var(--accent); border-color: transparent; color: #fff; box-shadow: 0 2px 8px rgba(37,99,235,.3); }
+    .btn.primary:hover { background: #1d4ed8; }
+    .btn.ok-btn { background: var(--ok-dim); border-color: var(--ok-border); color: var(--ok); }
+    .btn.ok-btn:hover { background: #d1fae5; }
+    .btn.danger-btn { background: var(--danger-dim); border-color: var(--danger-border); color: var(--danger); }
+    .btn.danger-btn:hover { background: #ffe4e6; }
+    .btn.sm { padding: 6px 12px; font-size: 12px; border-radius: 7px; }
+
+    /* BADGES */
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--surface2); border: 1px solid var(--border); color: var(--muted2); }
+    .badge.ok { background: var(--ok-dim); border-color: var(--ok-border); color: var(--ok); }
+    .badge.bad { background: var(--danger-dim); border-color: var(--danger-border); color: var(--danger); }
+    .badge.warn { background: var(--warn-dim); border-color: var(--warn-border); color: var(--warn); }
+    .badge.blue { background: var(--blue-dim); border-color: var(--blue-border); color: var(--accent); }
+
+    /* TABLE */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 9px 14px; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .4px; color: var(--muted2); text-transform: uppercase; background: var(--surface2); border-bottom: 1px solid var(--border); }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text); font-size: 12px; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafbfc; }
+    .mono { font-family: var(--mono); font-size: 11px; color: var(--muted2); }
+    .empty { padding: 28px; text-align: center; color: var(--muted); font-size: 12px; }
+
+    /* MISC */
+    .divider { height: 1px; background: var(--border); margin: 12px 0; }
+    .gap10 { display: flex; flex-direction: column; gap: 10px; }
+    .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .lbl { font-size: 11px; font-weight: 700; color: var(--muted2); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .5px; }
+    .info-box { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 12px; color: var(--muted2); }
+    .ag3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
+
+    /* FILTER BAR */
+    .filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+    .fsel { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius-sm); padding: 7px 10px; color: var(--text); font-family: var(--sans); font-size: 12px; outline: none; }
+
+    /* BUYERS */
+    .buyers-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    .buyer-chip { padding: 5px 10px; border-radius: 7px; background: var(--surface2); border: 1px solid var(--border2); font-family: var(--mono); font-size: 11px; color: var(--muted2); cursor: pointer; transition: all .1s; }
+    .buyer-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--blue-dim); }
+
+    /* RECIENTES */
+    .recent-chip {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 7px 11px; border-radius: 8px;
+      background: var(--surface2); border: 1px solid var(--border2);
+      font-size: 11px; cursor: pointer; transition: all .1s; text-align: left;
+    }
+    .recent-chip:hover { border-color: var(--accent); background: var(--blue-dim); }
+    .recent-chip .rc-id { font-family: var(--mono); color: var(--text); font-weight: 500; }
+    .recent-chip .rc-date { color: var(--muted); font-size: 10px; }
+
+    /* TOAST */
+    .toast-host { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
+    .toast-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-md); min-width: 240px; max-width: min(380px,calc(100vw - 32px)); animation: slideUp .15s ease-out; }
+    .toast-item.ok { border-color: var(--ok-border); background: var(--ok-dim); }
+    .toast-item.err { border-color: var(--danger-border); background: var(--danger-dim); }
+    @keyframes slideUp { from { transform: translateY(8px); opacity: 0; } }
+    .toast-msg { font-size: 12px; flex: 1; color: var(--text); }
+    .toast-close { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 14px; padding: 0; }
+
+    /* SPINNER */
+    .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border2); border-top-color: var(--accent); animation: spin .7s linear infinite; display: inline-block; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    tr.log-blocked td { background: #fff5f5; }
+  </style>
 </head>
-
 <body>
 
-<header>
-GestionPro Admin
-</header>
+<nav>
+  <div class="nav-brand">
+    <div class="nav-logo">⚡</div>
+    <div>
+      <div>GestionPro Admin</div>
+      <div class="nav-sub">Backoffice · Cloudflare D1</div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <div class="tabs">
+      <button class="tab active" data-tab="users">👤 Usuarios</button>
+      <button class="tab" data-tab="buyers">💳 Compradores</button>
+      <button class="tab" data-tab="logs">🔍 API Logs</button>
+    </div>
+    <div class="spill">
+      <div class="sdot" id="sdot"></div>
+      <span id="stext">Listo</span>
+    </div>
+    <a href="/cdn-cgi/access/logout" class="btn sm danger-btn" style="text-decoration:none">Salir</a>
+  </div>
+</nav>
 
-<div class="container">
+<div class="wrap">
 
-<div class="card">
+  <!-- ══ USUARIOS ══ -->
+  <div class="page active" id="tab-users">
+    <div class="stack">
 
-<h3>Buscar usuario</h3>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><div class="cicon">🔎</div>Buscar usuario</div>
+          <button id="historyBtn" class="btn sm" title="Recientes">🕐 Recientes <span id="historyCount" class="badge" style="margin-left:4px">0</span></button>
+        </div>
+        <div class="card-body">
+          <div class="irow">
+            <input id="q" class="input" placeholder="deviceId o SUP-XXXXXXXX" style="max-width:400px" />
+            <button id="searchBtn" class="btn primary">Buscar</button>
+          </div>
+          <div id="recentPanel" style="display:none;margin-top:10px">
+            <div class="lbl" style="margin-bottom:6px">Últimas búsquedas</div>
+            <div id="recentList" class="buyers-grid"></div>
+          </div>
+          <div id="searchHint" class="info-box" style="margin-top:10px">
+            Introduce un <b>deviceId</b> o un <b>supportId</b> (SUP-XXXXXXXX) para cargar los datos del usuario.
+          </div>
+          <div id="who" style="display:none"></div>
+        </div>
+      </div>
 
-<input id="q" placeholder="deviceId o supportId">
-<button onclick="loadUser()">Buscar</button>
+      <div class="g2" id="userGrid" style="display:none">
+
+        <!-- Quota -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title"><div class="cicon">🎯</div>Cuota de créditos</div>
+            <span id="quotaMeta" class="mono" style="font-size:10px;color:var(--muted)">—</span>
+          </div>
+          <div class="card-body gap10">
+
+            <!-- DESTACADO: créditos disponibles -->
+            <div class="avail-box">
+              <div id="kAvail" class="avail-num">—</div>
+              <div>
+                <div class="avail-label">Créditos disponibles ahora</div>
+                <div class="avail-sub">Los que puede usar en este momento</div>
+              </div>
+            </div>
+
+            <!-- Total / Usados / Restantes -->
+            <div class="g3">
+              <div class="kpi">
+                <div id="kTotal" class="kpi-num">—</div>
+                <div class="kpi-label">Total</div>
+              </div>
+              <div class="kpi danger">
+                <div id="kUsed" class="kpi-num">—</div>
+                <div class="kpi-label">Usados</div>
+              </div>
+              <div class="kpi ok">
+                <div id="kRem" class="kpi-num">—</div>
+                <div class="kpi-label">Restantes</div>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div>
+              <div class="lbl">Identificadores</div>
+              <div class="info-box" style="display:flex;flex-direction:column;gap:5px">
+                <div><span style="color:var(--muted)">deviceId &nbsp;</span><span id="deviceId" class="mono">—</span></div>
+                <div><span style="color:var(--muted)">supportId </span><span id="supportId" class="mono">—</span></div>
+              </div>
+            </div>
+
+            <div>
+              <div class="lbl">Añadir / quitar créditos</div>
+              <div class="ag3">
+                <button class="btn ok-btn sm" data-add="10">+10</button>
+                <button class="btn ok-btn sm" data-add="30">+30</button>
+                <button class="btn ok-btn sm" data-add="70">+70</button>
+                <button class="btn danger-btn sm" data-add="-10">−10</button>
+                <button class="btn danger-btn sm" data-add="-30">−30</button>
+                <button class="btn danger-btn sm" data-add="-70">−70</button>
+              </div>
+            </div>
+
+            <div>
+              <div class="lbl">Cantidad personalizada</div>
+              <div class="irow">
+                <input id="customCredits" class="input" placeholder="Ej: 15 o -5" />
+                <button id="applyBtn" class="btn primary sm">Aplicar</button>
+              </div>
+            </div>
+
+            <div>
+              <div class="lbl">Nota (opcional)</div>
+              <input id="note" class="input" placeholder="Motivo del ajuste..." />
+            </div>
+
+            <div class="row">
+              <button id="reconcileBtn" class="btn sm">🔄 Reconciliar</button>
+              <button id="resetUserBtn" class="btn sm danger-btn">⚠️ Reset a 5</button>
+            </div>
+
+            <div id="actionInfo" class="mono" style="font-size:11px;color:var(--muted)">—</div>
+            <div id="calcBox" style="display:none"></div>
+          </div>
+        </div>
+
+        <!-- Compras -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title"><div class="cicon">🛒</div>Compras</div>
+            <div id="pCount" class="badge">—</div>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Fecha</th><th>Producto</th><th>Estado</th><th>Créditos</th><th>Token</th></tr></thead>
+              <tbody id="purchasesTbody"><tr><td colspan="5" class="empty">—</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Logs admin -->
+        <div class="card span2">
+          <div class="card-head">
+            <div class="card-title"><div class="cicon">📋</div>Historial de acciones admin</div>
+            <div id="lCount" class="badge">—</div>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Fecha</th><th>Admin</th><th>Acción</th><th>Delta</th><th>Nota</th></tr></thead>
+              <tbody id="logsTbody"><tr><td colspan="5" class="empty">—</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ COMPRADORES ══ -->
+  <div class="page" id="tab-buyers">
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title"><div class="cicon">💳</div>Usuarios con compras</div>
+        <div class="row">
+          <div id="buyersPill" class="badge">—</div>
+          <button id="loadBuyersBtn" class="btn sm primary">Cargar</button>
+          <button id="moreBuyersBtn" class="btn sm" style="display:none">Ver más</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="info-box" style="margin-bottom:12px">
+          Solo muestra deviceId con compras <span class="badge blue">PURCHASED</span>. Haz clic en uno para cargarlo en Usuarios.
+        </div>
+        <div id="buyersList" class="buyers-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ API LOGS ══ -->
+  <div class="page" id="tab-logs">
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title"><div class="cicon">🔍</div>Logs de llamadas a la IA</div>
+        <div class="row">
+          <div id="logApiCount" class="badge">—</div>
+          <button id="refreshLogsBtn" class="btn sm primary">↻ Actualizar</button>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <input id="logsDeviceFilter" class="input" placeholder="Filtrar por deviceId..." style="max-width:260px" />
+        <select id="logsBlockedFilter" class="fsel">
+          <option value="">Todas las llamadas</option>
+          <option value="1">Solo bloqueadas</option>
+        </select>
+        <select id="logsLimitFilter" class="fsel">
+          <option value="100">Últimas 100</option>
+          <option value="250">Últimas 250</option>
+          <option value="500">Últimas 500</option>
+        </select>
+        <button id="applyLogsFilter" class="btn sm">Filtrar</button>
+      </div>
+
+      <div class="card-body" style="border-bottom:1px solid var(--border)">
+        <div class="g3">
+          <div class="kpi">
+            <div id="logKpiTotal" class="kpi-num">—</div>
+            <div class="kpi-label">Llamadas totales</div>
+          </div>
+          <div class="kpi ok">
+            <div id="logKpiOk" class="kpi-num">—</div>
+            <div class="kpi-label">Exitosas</div>
+          </div>
+          <div class="kpi danger">
+            <div id="logKpiBlocked" class="kpi-num">—</div>
+            <div class="kpi-label">Bloqueadas</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>DeviceId</th><th>IP</th><th>Endpoint</th><th>Estado</th></tr></thead>
+          <tbody id="apiLogsTbody">
+            <tr><td colspan="5" class="empty">Pulsa "Actualizar" para cargar los logs</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
 </div>
-
-<div class="card">
-
-<h3>Resultado</h3>
-
-<pre id="out">—</pre>
-
-</div>
-
-</div>
-
+<div class="toast-host" id="toastHost"></div>
 
 <script>
+  const API = "";
+  const $ = id => document.getElementById(id);
+  const HISTORY_KEY = "gp_admin_recent";
+  const HISTORY_MAX = 50;
 
-async function loadUser(){
-
-  const q = document.getElementById("q").value.trim()
-
-  if(!q){
-    alert("Pon un deviceId")
-    return
+  // ── HISTORIAL LOCAL ──
+  function getHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]"); } catch { return []; }
   }
-
-  try{
-
-    const r = await fetch(
-      "/api/admin/user?query=" +
-      encodeURIComponent(q)
-    )
-
-    const t = await r.text()
-
-    try{
-      const j = JSON.parse(t)
-      document.getElementById("out").textContent =
-        JSON.stringify(j,null,2)
+  function saveToHistory(query) {
+    let h = getHistory().filter(i => i.q !== query);
+    h.unshift({ q: query, ts: new Date().toISOString() });
+    if (h.length > HISTORY_MAX) h = h.slice(0, HISTORY_MAX);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+    renderHistory();
+  }
+  function renderHistory() {
+    const h = getHistory();
+    $("historyCount").textContent = h.length;
+    const list = $("recentList");
+    list.innerHTML = "";
+    if (h.length === 0) {
+      list.innerHTML = `<div style="font-size:12px;color:var(--muted)">Sin búsquedas recientes</div>`;
+      return;
     }
-    catch{
-      document.getElementById("out").textContent = t
+    h.forEach(item => {
+      const btn = document.createElement("button");
+      btn.className = "recent-chip";
+      const ago = fmtAgo(item.ts);
+      btn.innerHTML = `<span class="rc-id">${esc(item.q.length>22?item.q.slice(0,22)+"…":item.q)}</span><span class="rc-date">${ago}</span>`;
+      btn.title = item.q;
+      btn.onclick = () => {
+        $("q").value = item.q;
+        $("recentPanel").style.display = "none";
+        loadUser();
+      };
+      list.appendChild(btn);
+    });
+  }
+  function fmtAgo(iso) {
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60) return "ahora mismo";
+    if (diff < 3600) return `hace ${Math.floor(diff/60)} min`;
+    if (diff < 86400) return `hace ${Math.floor(diff/3600)} h`;
+    return `hace ${Math.floor(diff/86400)} d`;
+  }
+
+  // Toggle panel recientes
+  $("historyBtn").onclick = () => {
+    const panel = $("recentPanel");
+    panel.style.display = panel.style.display === "none" ? "" : "none";
+  };
+  // Cerrar panel al hacer click fuera
+  document.addEventListener("click", e => {
+    if (!$("recentPanel").contains(e.target) && e.target !== $("historyBtn") && !$("historyBtn").contains(e.target)) {
+      $("recentPanel").style.display = "none";
     }
+  });
 
+  renderHistory();
+
+  function setStatus(state, text) { $("sdot").className="sdot "+state; $("stext").textContent=text; }
+
+  function toast(msg, kind="info", ttl=3500) {
+    const el = document.createElement("div");
+    el.className = "toast-item "+(kind==="ok"?"ok":kind==="err"?"err":"");
+    el.innerHTML = `<span style="font-size:15px">${kind==="ok"?"✅":kind==="err"?"❌":"ℹ️"}</span><div class="toast-msg">${esc(msg)}</div><button class="toast-close" onclick="this.closest('.toast-item').remove()">✕</button>`;
+    $("toastHost").appendChild(el);
+    setTimeout(()=>el.isConnected&&el.remove(), ttl);
   }
-  catch(e){
 
-    document.getElementById("out").textContent =
-      "ERROR: " + e.message
-
+  function esc(s) { return String(s||"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+  function fmt(n) { if(n===null||n===undefined||Number.isNaN(Number(n))) return "—"; return new Intl.NumberFormat("es-ES").format(Number(n)); }
+  function fmtDate(s) { if(!s) return "—"; return String(s).replace("T"," ").slice(0,16); }
+  function stateBadge(state) {
+    const s = String(state||"").toUpperCase();
+    if(s.includes("VALID")||s.includes("PURCHASED")||s==="1"||s==="OK") return `<span class="badge ok">✓ OK</span>`;
+    if(s.includes("PENDING")) return `<span class="badge warn">PENDING</span>`;
+    return `<span class="badge bad">${esc(state||"—")}</span>`;
   }
 
-}
+  async function apiFetch(path, opts={}) {
+    const r = await fetch(API+path, {headers:{"Content-Type":"application/json"},...opts});
+    const txt = await r.text();
+    let data; try { data=JSON.parse(txt); } catch { data={ok:false,error:"NON_JSON",raw:txt}; }
+    return {r, data};
+  }
 
+  // TABS
+  document.querySelectorAll(".tab").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+      document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+      btn.classList.add("active");
+      $("tab-"+btn.dataset.tab).classList.add("active");
+    };
+  });
+
+  let currentDeviceId=null, currentSupportId=null;
+
+  function clearUser() {
+    currentDeviceId=null; currentSupportId=null;
+    ["kTotal","kUsed","kRem","kAvail","quotaMeta","deviceId","supportId","who","pCount","lCount","actionInfo"].forEach(id=>$(id).textContent="—");
+    $("purchasesTbody").innerHTML=`<tr><td colspan="5" class="empty">—</td></tr>`;
+    $("logsTbody").innerHTML=`<tr><td colspan="5" class="empty">—</td></tr>`;
+    $("calcBox").style.display="none";
+    $("userGrid").style.display="none";
+    $("searchHint").style.display="";
+  }
+  clearUser();
+
+  function renderUser(d) {
+    currentDeviceId=d.deviceId||null; currentSupportId=d.supportId||null;
+    $("userGrid").style.display=""; $("searchHint").style.display="none";
+    $("deviceId").textContent=currentDeviceId||"—";
+    $("supportId").textContent=currentSupportId||"—";
+    $("who").textContent=currentDeviceId?currentDeviceId.slice(0,14)+"…":"—";
+    const q=d.quota||{};
+    const rem=Math.max(0,Number(q.remaining??0));
+    $("kTotal").textContent=fmt(q.total);
+    $("kUsed").textContent=fmt(q.used);
+    $("kRem").textContent=fmt(q.remaining);
+    $("kAvail").textContent=fmt(rem);
+    $("quotaMeta").textContent=d.updatedAt?fmtDate(d.updatedAt):"—";
+
+    const purchases=Array.isArray(d.purchases)?d.purchases:[];
+    $("pCount").textContent=purchases.length+" items";
+    $("purchasesTbody").innerHTML=purchases.length===0
+      ?`<tr><td colspan="5" class="empty">Sin compras</td></tr>`
+      :purchases.map(p=>`<tr>
+          <td class="mono">${esc(fmtDate(p.created_at))}</td>
+          <td><span class="badge blue">${esc(p.product_id||"—")}</span></td>
+          <td>${stateBadge(p.purchase_state)}</td>
+          <td style="font-weight:700">${fmt(p.credits_added)}</td>
+          <td class="mono">${esc(p.purchase_token_masked||"—")}</td>
+        </tr>`).join("");
+
+    const logs=Array.isArray(d.logs)?d.logs:[];
+    $("lCount").textContent=logs.length+" items";
+    $("logsTbody").innerHTML=logs.length===0
+      ?`<tr><td colspan="5" class="empty">Sin logs</td></tr>`
+      :logs.map(l=>`<tr>
+          <td class="mono">${esc(fmtDate(l.created_at))}</td>
+          <td class="mono">${esc(l.admin_email||"—")}</td>
+          <td><span class="badge">${esc(l.action||"—")}</span></td>
+          <td style="font-weight:700;color:${Number(l.delta_credits)>0?"var(--ok)":Number(l.delta_credits)<0?"var(--danger)":"var(--muted)"}">${Number(l.delta_credits)>0?"+":""}${fmt(l.delta_credits||0)}</td>
+          <td style="color:var(--muted2)">${esc(l.note||"")}</td>
+        </tr>`).join("");
+  }
+
+  async function loadUser() {
+    const q=$("q").value.trim();
+    if(!q){toast("Introduce un deviceId o supportId");return;}
+    clearUser(); setStatus("busy","Cargando...");
+    const {r,data}=await apiFetch(`/api/admin/user?query=${encodeURIComponent(q)}`);
+    if(r.status===401||r.status===403){setStatus("err","No autorizado");toast("No autorizado — comprueba Cloudflare Access","err",6000);return;}
+    if(!data?.ok){setStatus("err","Error");toast((data?.error||`HTTP ${r.status}`)+(data?.detail?" — "+data.detail:""),"err",7000);return;}
+    saveToHistory(q);
+    renderUser(data); setStatus("ok","Autorizado"); $("actionInfo").textContent="Listo";
+  }
+
+  async function addCredits(amount) {
+    if(!currentDeviceId){toast("Busca un usuario primero");return;}
+    const credits=Number(amount);
+    if(!Number.isFinite(credits)||credits===0){toast("Créditos inválidos");return;}
+    if(!confirm(`¿${credits>0?"Añadir":"Quitar"} ${Math.abs(credits)} créditos?`))return;
+    setStatus("busy","Guardando...");
+    const {r,data}=await apiFetch("/api/admin/add-credits",{method:"POST",body:JSON.stringify({deviceId:currentDeviceId,credits,note:$("note").value.trim()})});
+    if(!data?.ok){setStatus("err","Error");toast(data?.error||`HTTP ${r.status}`,"err");return;}
+    toast(credits>0?"Créditos añadidos":"Créditos quitados","ok");
+    await loadUser(); setStatus("ok","Autorizado");
+  }
+
+  async function reconcile() {
+    if(!currentDeviceId){toast("Busca un usuario primero");return;}
+    if(!confirm("¿Reconciliar? Recalcula el total (5 + compras)."))return;
+    setStatus("busy","Reconciliando...");
+    const body=currentSupportId?{supportId:currentSupportId}:{deviceId:currentDeviceId};
+    body.note=$("note").value.trim();
+    const {r,data}=await apiFetch("/api/admin/reconcile",{method:"POST",body:JSON.stringify(body)});
+    if(!data?.ok){setStatus("err","Error");toast(data?.error||`HTTP ${r.status}`,"err");return;}
+    if(data.detail){$("calcBox").style.display="";$("calcBox").innerHTML=`<div class="info-box" style="font-size:11px"><b>Reconciliación</b>: quotaFree=${esc(data.detail.quotaFree)} · sumPurchases=${esc(data.detail.sumPurchases)} · newTotal=${esc(data.detail.newTotal)}</div>`;}
+    toast("Reconciliado","ok"); await loadUser(); setStatus("ok","Autorizado");
+  }
+
+  async function resetUser() {
+    if(!currentDeviceId){toast("Busca un usuario primero");return;}
+    if(!confirm("¿Reset a 5? Deja total=5 y usados=0."))return;
+    setStatus("busy","Reseteando...");
+    const body=currentSupportId?{supportId:currentSupportId}:{deviceId:currentDeviceId};
+    body.note=$("note").value.trim();
+    const {r,data}=await apiFetch("/api/admin/reset-user",{method:"POST",body:JSON.stringify(body)});
+    if(!data?.ok){setStatus("err","Error");toast(data?.error||`HTTP ${r.status}`,"err");return;}
+    toast("Usuario reseteado a 5","ok"); await loadUser(); setStatus("ok","Autorizado");
+  }
+
+  let buyersCursor=0;
+  async function loadBuyers(reset=false) {
+    if(reset){buyersCursor=0;$("buyersList").innerHTML="";}
+    $("buyersPill").textContent="…"; setStatus("busy","Cargando...");
+    const {r,data}=await apiFetch(`/api/admin/purchasers?limit=60&cursor=${buyersCursor}`);
+    if(!data?.ok){setStatus("err","Error");toast(data?.error||`HTTP ${r.status}`,"err");return;}
+    const items=data.items||[];
+    if(items.length===0&&buyersCursor===0){$("buyersList").innerHTML=`<div class="empty">Sin compras registradas</div>`;$("buyersPill").textContent="0";setStatus("ok","Listo");return;}
+    items.forEach(it=>{
+      const c=document.createElement("button");
+      c.className="buyer-chip"; c.textContent=it.deviceId;
+      c.title=`Última compra: ${it.last_purchase_at||"—"} | Créditos: ${it.credits_purchased??0}`;
+      c.onclick=()=>{$("q").value=it.deviceId;document.querySelector("[data-tab='users']").click();loadUser();window.scrollTo({top:0,behavior:"smooth"});};
+      $("buyersList").appendChild(c);
+    });
+    $("buyersPill").textContent=String($("buyersList").children.length);
+    $("moreBuyersBtn").style.display=data.nextCursor!=null?"":"none";
+    if(data.nextCursor!=null)buyersCursor=data.nextCursor;
+    setStatus("ok","Listo");
+  }
+
+  async function loadApiLogs() {
+    setStatus("busy","Cargando logs...");
+    $("apiLogsTbody").innerHTML=`<tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr>`;
+    const dev=$("logsDeviceFilter").value.trim();
+    const blocked=$("logsBlockedFilter").value;
+    const limit=$("logsLimitFilter").value;
+    let qs=`?limit=${limit}`;
+    if(dev)qs+=`&deviceId=${encodeURIComponent(dev)}`;
+    if(blocked)qs+=`&blocked=${blocked}`;
+    const {r,data}=await apiFetch(`/api/admin/api-logs${qs}`);
+    if(!data?.ok){setStatus("err","Error");$("apiLogsTbody").innerHTML=`<tr><td colspan="5" class="empty">Error: ${esc(data?.error||r.status)}</td></tr>`;toast(data?.error||`HTTP ${r.status}`,"err");return;}
+    const logs=data.logs||[];
+    $("logApiCount").textContent=logs.length+" registros";
+    const bl=logs.filter(l=>l.blocked==1).length;
+    $("logKpiTotal").textContent=fmt(logs.length);
+    $("logKpiOk").textContent=fmt(logs.length-bl);
+    $("logKpiBlocked").textContent=fmt(bl);
+    $("apiLogsTbody").innerHTML=logs.length===0
+      ?`<tr><td colspan="5" class="empty">Sin registros para los filtros seleccionados</td></tr>`
+      :logs.map(l=>`<tr class="${l.blocked==1?'log-blocked':''}">
+          <td class="mono">${esc(fmtDate(l.created_at))}</td>
+          <td class="mono">${esc((l.device_id||"—").slice(0,16))}…</td>
+          <td class="mono">${esc(l.ip||"—")}</td>
+          <td><span class="badge blue">${esc((l.endpoint||"—").replace("/api/gemini/",""))}</span></td>
+          <td>${l.blocked==1?`<span class="badge bad">🚫 Bloqueado</span>`:`<span class="badge ok">✓ OK</span>`}</td>
+        </tr>`).join("");
+    setStatus("ok","Listo");
+  }
+
+  $("searchBtn").onclick=loadUser;
+  $("q").addEventListener("keydown",e=>e.key==="Enter"&&loadUser());
+  document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>addCredits(b.dataset.add));
+  $("applyBtn").onclick=()=>{const v=$("customCredits").value.trim();if(!v){toast("Pon créditos");return;}addCredits(v);};
+  $("reconcileBtn").onclick=reconcile;
+  $("resetUserBtn").onclick=resetUser;
+  $("loadBuyersBtn").onclick=()=>loadBuyers(true);
+  $("moreBuyersBtn").onclick=()=>loadBuyers(false);
+  $("refreshLogsBtn").onclick=loadApiLogs;
+  $("applyLogsFilter").onclick=loadApiLogs;
+  document.querySelector("[data-tab='logs']").addEventListener("click",()=>{if($("logApiCount").textContent==="—")loadApiLogs();});
 </script>
-
 </body>
 </html>
