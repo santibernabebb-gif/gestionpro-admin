@@ -444,43 +444,51 @@
 <script>
   const API = "";
   const $ = id => document.getElementById(id);
-  const HISTORY_KEY = "gp_admin_recent";
-  const HISTORY_MAX = 50;
 
-  // ── HISTORIAL LOCAL ──
-  function getHistory() {
-    try { return JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]"); } catch { return []; }
+  // ── HISTORIAL EN D1 (persiste entre sesiones, navegadores e incógnito) ──
+  async function loadHistory() {
+    try {
+      const r = await fetch("/api/admin/history");
+      const data = await r.json();
+      if (data.ok) renderHistory(data.items || []);
+    } catch (_) {}
   }
-  function saveToHistory(query) {
-    let h = getHistory().filter(i => i.q !== query);
-    h.unshift({ q: query, ts: new Date().toISOString() });
-    if (h.length > HISTORY_MAX) h = h.slice(0, HISTORY_MAX);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
-    renderHistory();
+
+  async function saveToHistory(query) {
+    try {
+      await fetch("/api/admin/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query })
+      });
+      await loadHistory();
+    } catch (_) {}
   }
-  function renderHistory() {
-    const h = getHistory();
-    $("historyCount").textContent = h.length;
+
+  function renderHistory(items) {
+    $("historyCount").textContent = items.length;
     const list = $("recentList");
     list.innerHTML = "";
-    if (h.length === 0) {
+    if (items.length === 0) {
       list.innerHTML = `<div style="font-size:12px;color:var(--muted)">Sin búsquedas recientes</div>`;
       return;
     }
-    h.forEach(item => {
+    items.forEach(item => {
       const btn = document.createElement("button");
       btn.className = "recent-chip";
-      const ago = fmtAgo(item.ts);
-      btn.innerHTML = `<span class="rc-id">${esc(item.q.length>22?item.q.slice(0,22)+"…":item.q)}</span><span class="rc-date">${ago}</span>`;
-      btn.title = item.q;
+      const ago = fmtAgo(item.searched_at);
+      const label = item.query.length > 22 ? item.query.slice(0, 22) + "…" : item.query;
+      btn.innerHTML = `<span class="rc-id">${esc(label)}</span><span class="rc-date">${ago}</span>`;
+      btn.title = item.query;
       btn.onclick = () => {
-        $("q").value = item.q;
+        $("q").value = item.query;
         $("recentPanel").style.display = "none";
         loadUser();
       };
       list.appendChild(btn);
     });
   }
+
   function fmtAgo(iso) {
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
     if (diff < 60) return "ahora mismo";
@@ -490,9 +498,14 @@
   }
 
   // Toggle panel recientes
-  $("historyBtn").onclick = () => {
+  $("historyBtn").onclick = async () => {
     const panel = $("recentPanel");
-    panel.style.display = panel.style.display === "none" ? "" : "none";
+    if (panel.style.display === "none") {
+      await loadHistory();
+      panel.style.display = "";
+    } else {
+      panel.style.display = "none";
+    }
   };
   // Cerrar panel al hacer click fuera
   document.addEventListener("click", e => {
@@ -501,7 +514,8 @@
     }
   });
 
-  renderHistory();
+  // Cargar historial al arrancar para mostrar el contador
+  loadHistory();
 
   function setStatus(state, text) { $("sdot").className="sdot "+state; $("stext").textContent=text; }
 
