@@ -36,7 +36,7 @@ export const onRequest: PagesFunction = async (context) => {
 
     if (request.method === "GET") {
       const rows = await db.prepare(
-        "SELECT query, searched_at FROM admin_history ORDER BY searched_at DESC LIMIT 100"
+        "SELECT query, alias, searched_at FROM admin_history ORDER BY searched_at DESC LIMIT 100"
       ).all();
       return new Response(JSON.stringify({ ok: true, items: rows.results || [] }), {
         headers: { "Content-Type": "application/json" }
