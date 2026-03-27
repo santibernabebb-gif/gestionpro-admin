@@ -646,12 +646,17 @@
     const {r,data}=await apiFetch(`/api/admin/user?query=${encodeURIComponent(q)}`);
     if(r.status===401||r.status===403){setStatus("err","No autorizado");toast("No autorizado — comprueba Cloudflare Access","err",6000);return;}
     if(!data?.ok){setStatus("err","Error");toast((data?.error||`HTTP ${r.status}`)+(data?.detail?" — "+data.detail:""),"err",7000);return;}
-    // Guardar en historial y recuperar alias existente para mostrarlo
+    // Primero leemos el alias existente en D1 (antes de guardar, para no perderlo)
+    let existingAlias = "";
+    try {
+      const histR = await fetch("/api/admin/history");
+      const histData = await histR.json();
+      const histItem = (histData.items||[]).find(i => i.query === q);
+      existingAlias = histItem?.alias || "";
+    } catch(_) {}
+    // Guardar en historial (el backend conserva el alias que ya tenía)
     await saveToHistory(q);
-    const histR = await fetch("/api/admin/history");
-    const histData = await histR.json();
-    const histItem = (histData.items||[]).find(i=>i.query===q);
-    data._alias = histItem?.alias || "";
+    data._alias = existingAlias;
     renderUser(data); setStatus("ok","Autorizado"); $("actionInfo").textContent="Listo";
   }
 
@@ -765,3 +770,4 @@
 </script>
 </body>
 </html>
+
