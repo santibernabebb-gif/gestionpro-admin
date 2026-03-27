@@ -44,12 +44,22 @@ export const onRequest: PagesFunction = async (context) => {
     }
 
     if (request.method === "POST") {
-      const body = await request.json() as { query?: string };
+      const body = await request.json() as { query?: string; alias?: string; updateAlias?: boolean };
       const q = String(body?.query || "").trim().slice(0, 200);
+      const alias = String(body?.alias || "").trim().slice(0, 100);
       if (!q) return new Response(JSON.stringify({ ok: false, error: "MISSING_QUERY" }), { status: 400, headers: { "Content-Type": "application/json" } });
-      // Eliminar duplicado si existe, luego insertar al principio
+
+      // Si solo actualiza el alias sin cambiar la búsqueda
+      if (body?.updateAlias) {
+        await db.prepare("UPDATE admin_history SET alias = ? WHERE query = ?").bind(alias, q).run();
+        return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
+      }
+
+      // Guardar búsqueda — si ya existe conserva el alias que tenía
+      const existing = await db.prepare("SELECT alias FROM admin_history WHERE query = ?").bind(q).first() as { alias?: string } | null;
+      const keepAlias = existing?.alias || alias;
       await db.prepare("DELETE FROM admin_history WHERE query = ?").bind(q).run();
-      await db.prepare("INSERT INTO admin_history (query, searched_at) VALUES (?, datetime('now'))").bind(q).run();
+      await db.prepare("INSERT INTO admin_history (query, alias, searched_at) VALUES (?, ?, datetime('now'))").bind(q, keepAlias).run();
       // Mantener solo los últimos 100
       await db.prepare(
         "DELETE FROM admin_history WHERE id NOT IN (SELECT id FROM admin_history ORDER BY searched_at DESC LIMIT 100)"
@@ -121,3 +131,4 @@ async function hmacSha256Hex(secret: string, message: string) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
