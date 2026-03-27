@@ -21,6 +21,7 @@ export const onRequest: PagesFunction = async (context) => {
     "/admin/reset-user": new Set(["POST"]),
     "/admin/purchasers": new Set(["GET"]),
     "/admin/api-logs": new Set(["GET"]),
+    "/admin/history": new Set(["GET", "POST"]),
   };
 
   const allowedMethods = allowedRoutes[targetPath];
@@ -28,7 +29,36 @@ export const onRequest: PagesFunction = async (context) => {
     return new Response("Not Found", { status: 404 });
   }
 
-  // 3) Proxy firmado hacia el Worker
+  // 3) Historial local — se gestiona directo en Pages (D1 binding) sin pasar por el Worker
+  if (targetPath === "/admin/history") {
+    const db = (env as any)["gestionpro-db"];
+    if (!db) return new Response(JSON.stringify({ ok: false, error: "D1_BINDING_MISSING" }), { status: 500, headers: { "Content-Type": "application/json" } });
+
+    if (request.method === "GET") {
+      const rows = await db.prepare(
+        "SELECT query, searched_at FROM admin_history ORDER BY searched_at DESC LIMIT 100"
+      ).all();
+      return new Response(JSON.stringify({ ok: true, items: rows.results || [] }), {
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    if (request.method === "POST") {
+      const body = await request.json() as { query?: string };
+      const q = String(body?.query || "").trim().slice(0, 200);
+      if (!q) return new Response(JSON.stringify({ ok: false, error: "MISSING_QUERY" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      // Eliminar duplicado si existe, luego insertar al principio
+      await db.prepare("DELETE FROM admin_history WHERE query = ?").bind(q).run();
+      await db.prepare("INSERT INTO admin_history (query, searched_at) VALUES (?, datetime('now'))").bind(q).run();
+      // Mantener solo los últimos 100
+      await db.prepare(
+        "DELETE FROM admin_history WHERE id NOT IN (SELECT id FROM admin_history ORDER BY searched_at DESC LIMIT 100)"
+      ).run();
+      return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
+    }
+  }
+
+  // 4) Proxy firmado hacia el Worker
   const targetUrl =
     "https://mi-api-presupuestos-v5.santibernabebb.workers.dev" +
     targetPath +
