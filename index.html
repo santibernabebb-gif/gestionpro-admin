@@ -183,7 +183,8 @@
       font-size: 11px; cursor: pointer; transition: all .1s; text-align: left;
     }
     .recent-chip:hover { border-color: var(--accent); background: var(--blue-dim); }
-    .recent-chip .rc-id { font-family: var(--mono); color: var(--text); font-weight: 500; }
+    .recent-chip .rc-alias { color: var(--accent); font-weight: 700; font-size: 12px; }
+    .recent-chip .rc-id { font-family: var(--mono); color: var(--muted2); font-weight: 400; font-size: 10px; }
     .recent-chip .rc-date { color: var(--muted); font-size: 10px; }
 
     /* TOAST */
@@ -248,6 +249,13 @@
           </div>
           <div id="searchHint" class="info-box" style="margin-top:10px">
             Introduce un <b>deviceId</b> o un <b>supportId</b> (SUP-XXXXXXXX) para cargar los datos del usuario.
+          </div>
+          <div id="aliasRow" style="display:none;margin-top:10px">
+            <div class="lbl" style="margin-bottom:5px">Alias / Nota para este usuario</div>
+            <div class="irow">
+              <input id="aliasInput" class="input" placeholder="Ej: Juan García - problema créditos" style="max-width:400px" />
+              <button id="saveAliasBtn" class="btn sm ok-btn">Guardar</button>
+            </div>
           </div>
           <div id="who" style="display:none"></div>
         </div>
@@ -478,8 +486,14 @@
       btn.className = "recent-chip";
       const ago = fmtAgo(item.searched_at);
       const label = item.query.length > 22 ? item.query.slice(0, 22) + "…" : item.query;
-      btn.innerHTML = `<span class="rc-id">${esc(label)}</span><span class="rc-date">${ago}</span>`;
-      btn.title = item.query;
+      const aliasHtml = item.alias
+        ? `<span class="rc-alias">${esc(item.alias)}</span>`
+        : "";
+      btn.innerHTML = `
+        ${aliasHtml}
+        <span class="rc-id">${esc(label)}</span>
+        <span class="rc-date">${ago}</span>`;
+      btn.title = item.alias ? `${item.alias} · ${item.query}` : item.query;
       btn.onclick = () => {
         $("q").value = item.query;
         $("recentPanel").style.display = "none";
@@ -564,12 +578,17 @@
     $("calcBox").style.display="none";
     $("userGrid").style.display="none";
     $("searchHint").style.display="";
+    $("aliasRow").style.display="none";
+    $("aliasInput").value="";
   }
   clearUser();
 
   function renderUser(d) {
     currentDeviceId=d.deviceId||null; currentSupportId=d.supportId||null;
     $("userGrid").style.display=""; $("searchHint").style.display="none";
+    // Mostrar campo alias
+    $("aliasRow").style.display="";
+    $("aliasInput").value = d._alias || "";
     $("deviceId").textContent=currentDeviceId||"—";
     $("supportId").textContent=currentSupportId||"—";
     $("who").textContent=currentDeviceId?currentDeviceId.slice(0,14)+"…":"—";
@@ -613,7 +632,12 @@
     const {r,data}=await apiFetch(`/api/admin/user?query=${encodeURIComponent(q)}`);
     if(r.status===401||r.status===403){setStatus("err","No autorizado");toast("No autorizado — comprueba Cloudflare Access","err",6000);return;}
     if(!data?.ok){setStatus("err","Error");toast((data?.error||`HTTP ${r.status}`)+(data?.detail?" — "+data.detail:""),"err",7000);return;}
-    saveToHistory(q);
+    // Guardar en historial y recuperar alias existente para mostrarlo
+    await saveToHistory(q);
+    const histR = await fetch("/api/admin/history");
+    const histData = await histR.json();
+    const histItem = (histData.items||[]).find(i=>i.query===q);
+    data._alias = histItem?.alias || "";
     renderUser(data); setStatus("ok","Autorizado"); $("actionInfo").textContent="Listo";
   }
 
@@ -702,6 +726,14 @@
     setStatus("ok","Listo");
   }
 
+  $("saveAliasBtn").onclick=async()=>{
+    if(!currentDeviceId){toast("Busca un usuario primero");return;}
+    const alias=$("aliasInput").value.trim();
+    const q=$("q").value.trim()||currentDeviceId;
+    await fetch("/api/admin/history",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q,alias,updateAlias:true})});
+    await loadHistory();
+    toast("Alias guardado","ok");
+  };
   $("searchBtn").onclick=loadUser;
   $("q").addEventListener("keydown",e=>e.key==="Enter"&&loadUser());
   document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>addCredits(b.dataset.add));
