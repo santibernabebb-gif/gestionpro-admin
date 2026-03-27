@@ -250,14 +250,25 @@
           <div id="searchHint" class="info-box" style="margin-top:10px">
             Introduce un <b>deviceId</b> o un <b>supportId</b> (SUP-XXXXXXXX) para cargar los datos del usuario.
           </div>
-          <div id="aliasRow" style="display:none;margin-top:10px">
-            <div class="lbl" style="margin-bottom:5px">Alias / Nota para este usuario</div>
-            <div class="irow">
-              <input id="aliasInput" class="input" placeholder="Ej: Juan García - problema créditos" style="max-width:400px" />
-              <button id="saveAliasBtn" class="btn sm ok-btn">Guardar</button>
-            </div>
-          </div>
+
           <div id="who" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- Alias del usuario — se muestra cuando hay datos cargados -->
+      <div id="aliasCard" style="display:none;margin-bottom:0">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title"><div class="cicon">🏷️</div>Nombre / Nota del usuario</div>
+            <div id="aliasDisplay" style="font-size:13px;font-weight:600;color:var(--accent)">—</div>
+          </div>
+          <div class="card-body">
+            <div class="irow">
+              <input id="aliasInput" class="input" placeholder="Ej: Juan García - problema créditos" style="max-width:500px" />
+              <button id="saveAliasBtn" class="btn sm ok-btn">💾 Guardar nota</button>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:6px">Esta nota aparece en el historial de recientes para identificar al usuario rápidamente.</div>
+          </div>
         </div>
       </div>
 
@@ -486,12 +497,12 @@
       btn.className = "recent-chip";
       const ago = fmtAgo(item.searched_at);
       const label = item.query.length > 22 ? item.query.slice(0, 22) + "…" : item.query;
-      const aliasHtml = item.alias
-        ? `<span class="rc-alias">${esc(item.alias)}</span>`
-        : "";
+      // Si hay alias, mostrarlo como nombre principal; si no, mostrar el ID
+      const mainLabel = item.alias || label;
+      const subLabel = item.alias ? label : "";
       btn.innerHTML = `
-        ${aliasHtml}
-        <span class="rc-id">${esc(label)}</span>
+        <span class="rc-alias">${esc(mainLabel)}</span>
+        ${subLabel ? `<span class="rc-id">${esc(subLabel)}</span>` : ""}
         <span class="rc-date">${ago}</span>`;
       btn.title = item.alias ? `${item.alias} · ${item.query}` : item.query;
       btn.onclick = () => {
@@ -578,17 +589,20 @@
     $("calcBox").style.display="none";
     $("userGrid").style.display="none";
     $("searchHint").style.display="";
-    $("aliasRow").style.display="none";
+    $("aliasCard").style.display="none";
     $("aliasInput").value="";
+    $("aliasDisplay").textContent="—";
   }
   clearUser();
 
   function renderUser(d) {
     currentDeviceId=d.deviceId||null; currentSupportId=d.supportId||null;
     $("userGrid").style.display=""; $("searchHint").style.display="none";
-    // Mostrar campo alias
-    $("aliasRow").style.display="";
+    // Mostrar alias card y rellenar
+    $("aliasCard").style.display="";
     $("aliasInput").value = d._alias || "";
+    $("aliasDisplay").textContent = d._alias || "Sin nota";
+    $("aliasDisplay").style.color = d._alias ? "var(--accent)" : "var(--muted)";
     $("deviceId").textContent=currentDeviceId||"—";
     $("supportId").textContent=currentSupportId||"—";
     $("who").textContent=currentDeviceId?currentDeviceId.slice(0,14)+"…":"—";
@@ -732,7 +746,10 @@
     const q=$("q").value.trim()||currentDeviceId;
     await fetch("/api/admin/history",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q,alias,updateAlias:true})});
     await loadHistory();
-    toast("Alias guardado","ok");
+    // Actualizar display inmediatamente sin recargar
+    $("aliasDisplay").textContent = alias || "Sin nota";
+    $("aliasDisplay").style.color = alias ? "var(--accent)" : "var(--muted)";
+    toast("Nota guardada","ok");
   };
   $("searchBtn").onclick=loadUser;
   $("q").addEventListener("keydown",e=>e.key==="Enter"&&loadUser());
