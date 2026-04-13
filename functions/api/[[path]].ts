@@ -1,5 +1,5 @@
 export const onRequest: PagesFunction = async (context) => {
-  const { request, env } = context; 
+  const { request, env } = context;
 
   // 1) Identidad real desde Cloudflare Access usando la cookie
   const who = await fetchIdentityFromAccess(request);
@@ -32,14 +32,19 @@ export const onRequest: PagesFunction = async (context) => {
   // 3) Historial local — se gestiona directo en Pages (D1 binding) sin pasar por el Worker
   if (targetPath === "/admin/history") {
     const db = (env as any)["gestionpro-db"];
-    if (!db) return new Response(JSON.stringify({ ok: false, error: "D1_BINDING_MISSING" }), { status: 500, headers: { "Content-Type": "application/json" } });
+    if (!db) {
+      return new Response(JSON.stringify({ ok: false, error: "D1_BINDING_MISSING" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     if (request.method === "GET") {
       const rows = await db.prepare(
         "SELECT query, alias, searched_at FROM admin_history ORDER BY searched_at DESC LIMIT 100"
       ).all();
       return new Response(JSON.stringify({ ok: true, items: rows.results || [] }), {
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -47,12 +52,19 @@ export const onRequest: PagesFunction = async (context) => {
       const body = await request.json() as { query?: string; alias?: string; updateAlias?: boolean };
       const q = String(body?.query || "").trim().slice(0, 200);
       const alias = String(body?.alias || "").trim().slice(0, 100);
-      if (!q) return new Response(JSON.stringify({ ok: false, error: "MISSING_QUERY" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      if (!q) {
+        return new Response(JSON.stringify({ ok: false, error: "MISSING_QUERY" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
 
       // Si solo actualiza el alias sin cambiar la búsqueda
       if (body?.updateAlias) {
         await db.prepare("UPDATE admin_history SET alias = ? WHERE query = ?").bind(alias, q).run();
-        return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json" },
+        });
       }
 
       // Guardar búsqueda — si ya existe conserva el alias que tenía
@@ -64,15 +76,25 @@ export const onRequest: PagesFunction = async (context) => {
       await db.prepare(
         "DELETE FROM admin_history WHERE id NOT IN (SELECT id FROM admin_history ORDER BY searched_at DESC LIMIT 100)"
       ).run();
-      return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
     }
   }
 
-  // 4) Proxy firmado hacia el Worker
-  const targetUrl =
-    "https://mi-api-presupuestos-v5.santibernabebb.workers.dev" +
-    targetPath +
-    u.search;
+  // 4) Proxy firmado hacia el Worker, con selector de entorno
+  const envParam = (u.searchParams.get("env") || "prod").toLowerCase();
+
+  const WORKER_BASE_URL_PROD =
+    ((env as any).WORKER_BASE_URL_PROD as string | undefined) ||
+    "https://mi-api-presupuestos-v5.santibernabebb.workers.dev";
+
+  const WORKER_BASE_URL_TEST =
+    ((env as any).WORKER_BASE_URL_TEST as string | undefined) ||
+    "https://verifactugestionpro.santibernabebb.workers.dev";
+
+  const baseUrl = envParam === "test" ? WORKER_BASE_URL_TEST : WORKER_BASE_URL_PROD;
+  const targetUrl = baseUrl + targetPath + u.search;
 
   const ts = Date.now().toString();
   const dataToSign = `${ts}:${email}:${request.method}:${targetPath}:${u.search}`;
