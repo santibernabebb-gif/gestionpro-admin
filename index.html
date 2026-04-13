@@ -214,6 +214,11 @@
     </div>
   </div>
   <div class="nav-right">
+    <select id="envSelect" class="fsel" title="Selecciona el entorno" style="min-width:160px">
+      <option value="prod">Producción</option>
+      <option value="test">Pruebas</option>
+    </select>
+    <div id="envBadge" class="badge blue">Entorno: Producción</div>
     <div class="tabs">
       <button class="tab active" data-tab="users">👤 Usuarios</button>
       <button class="tab" data-tab="buyers">💳 Compradores</button>
@@ -463,6 +468,35 @@
 <script>
   const API = "";
   const $ = id => document.getElementById(id);
+  const ADMIN_ENV_KEY = "gp_admin_env";
+
+  function getSelectedEnv() {
+    const saved = localStorage.getItem(ADMIN_ENV_KEY);
+    return saved === "test" ? "test" : "prod";
+  }
+
+  function setSelectedEnv(env) {
+    const normalized = env === "test" ? "test" : "prod";
+    localStorage.setItem(ADMIN_ENV_KEY, normalized);
+    if ($("envSelect")) $("envSelect").value = normalized;
+    if ($("envBadge")) $("envBadge").textContent = `Entorno: ${normalized === "test" ? "Pruebas" : "Producción"}`;
+  }
+
+  function withEnv(path) {
+    const env = getSelectedEnv();
+    if (path.includes("/api/admin/history")) return path;
+    const sep = path.includes("?") ? "&" : "?";
+    return `${path}${sep}env=${encodeURIComponent(env)}`;
+  }
+
+  setSelectedEnv(getSelectedEnv());
+  $("envSelect").addEventListener("change", () => {
+    setSelectedEnv($("envSelect").value);
+    toast(`Entorno cambiado a ${getSelectedEnv() === "test" ? "Pruebas" : "Producción"}`, "ok", 1800);
+    if (currentDeviceId) {
+      loadUser();
+    }
+  });
 
   // ── HISTORIAL EN D1 (persiste entre sesiones, navegadores e incógnito) ──
   async function loadHistory() {
@@ -563,7 +597,7 @@
   }
 
   async function apiFetch(path, opts={}) {
-    const r = await fetch(API+path, {headers:{"Content-Type":"application/json"},...opts});
+    const r = await fetch(API+withEnv(path), {headers:{"Content-Type":"application/json"},...opts});
     const txt = await r.text();
     let data; try { data=JSON.parse(txt); } catch { data={ok:false,error:"NON_JSON",raw:txt}; }
     return {r, data};
@@ -770,4 +804,5 @@
 </script>
 </body>
 </html>
+
 
