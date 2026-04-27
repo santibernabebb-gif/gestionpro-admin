@@ -222,6 +222,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="users">👤 Usuarios</button>
       <button class="tab" data-tab="buyers">💳 Compradores</button>
+      <button class="tab" data-tab="allusers">👥 Todos los usuarios</button>
       <button class="tab" data-tab="logs">🔍 API Logs</button>
     </div>
     <div class="spill">
@@ -244,13 +245,6 @@
           <button id="historyBtn" class="btn sm" title="Recientes">🕐 Recientes <span id="historyCount" class="badge" style="margin-left:4px">0</span></button>
         </div>
         <div class="card-body">
-          <!-- Búsqueda por email o userId (desde carpeta R2) -->
-          <div class="irow" style="margin-bottom:10px">
-            <input id="emailQ" class="input" placeholder="Buscar por email o userId (de R2)..." style="max-width:400px" />
-            <button id="emailSearchBtn" class="btn" style="background:#6366f1;color:#fff">Buscar</button>
-          </div>
-          <div id="emailResults" style="display:none;margin-bottom:14px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0"></div>
-
           <div class="irow">
             <input id="q" class="input" placeholder="deviceId o SUP-XXXXXXXX" style="max-width:400px" />
             <button id="searchBtn" class="btn primary">Buscar</button>
@@ -412,6 +406,25 @@
           Solo muestra deviceId con compras <span class="badge blue">PURCHASED</span>. Haz clic en uno para cargarlo en Usuarios.
         </div>
         <div id="buyersList" class="buyers-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TODOS LOS USUARIOS ══ -->
+  <div class="page" id="tab-allusers">
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title"><div class="cicon">👥</div>Todos los usuarios registrados</div>
+        <div id="allusersPill" class="badge">—</div>
+      </div>
+      <div class="card-body">
+        <div class="irow" style="margin-bottom:12px">
+          <input id="allusersFilter" class="input" placeholder="Filtrar por email..." style="max-width:300px" />
+        </div>
+        <div id="allusersList"></div>
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button id="allusersMoreBtn" class="btn" style="display:none">Cargar más</button>
+        </div>
       </div>
     </div>
   </div>
@@ -757,6 +770,65 @@
     setStatus("ok","Listo");
   }
 
+  // ── Todos los usuarios ──────────────────────────────────────────────────
+  let allUsersCursor=null;
+  let allUsersData=[];
+
+  async function loadAllUsers(reset=false) {
+    if(reset){ allUsersCursor=null; allUsersData=[]; $("allusersList").innerHTML=""; }
+    setStatus("busy","Cargando usuarios...");
+    const cursorParam = allUsersCursor ? `&cursor=${encodeURIComponent(allUsersCursor)}` : "";
+    const {r,data}=await apiFetch(`/api/admin/all-users?limit=50${cursorParam}`);
+    if(!data?.ok){ setStatus("err","Error"); toast(data?.error||`HTTP ${r.status}`,"err"); return; }
+    const users=data.users||[];
+    allUsersData=[...allUsersData,...users];
+    renderAllUsers();
+    $("allusersPill").textContent=String(allUsersData.length)+(data.nextCursor?"+":"");
+    $("allusersMoreBtn").style.display=data.nextCursor?"":"none";
+    allUsersCursor=data.nextCursor||null;
+    setStatus("ok","Listo");
+  }
+
+  function renderAllUsers() {
+    const filter=$("allusersFilter").value.trim().toLowerCase();
+    const filtered=allUsersData.filter(u=>
+      !filter||u.email?.toLowerCase().includes(filter)||u.userId?.includes(filter)
+    );
+    if(!filtered.length){
+      $("allusersList").innerHTML=`<div class="empty">Sin resultados</div>`;
+      return;
+    }
+    $("allusersList").innerHTML=`
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:#f1f5f9;text-align:left">
+            <th style="padding:8px 10px;border-bottom:1px solid #e2e8f0">Email</th>
+            <th style="padding:8px 10px;border-bottom:1px solid #e2e8f0">userId</th>
+            <th style="padding:8px 10px;border-bottom:1px solid #e2e8f0">deviceId</th>
+            <th style="padding:8px 10px;border-bottom:1px solid #e2e8f0">Registro</th>
+            <th style="padding:8px 10px;border-bottom:1px solid #e2e8f0"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered.map(u=>`
+            <tr style="border-bottom:1px solid #f0f0f0">
+              <td style="padding:8px 10px"><b>${u.email||"—"}</b></td>
+              <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:#666">${u.userId||"—"}</td>
+              <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:#666">${u.deviceId||"—"}</td>
+              <td style="padding:8px 10px;color:#888;font-size:11px">${u.createdAt?u.createdAt.substring(0,10):"—"}</td>
+              <td style="padding:8px 10px">
+                ${u.deviceId?`<button onclick="$('q').value='${u.deviceId}';document.querySelector('[data-tab=\\'users\\']').click();loadUser();window.scrollTo({top:0,behavior:'smooth'})" style="font-size:11px;padding:3px 8px;background:#1976D2;color:#fff;border:none;border-radius:5px;cursor:pointer">Cargar →</button>`:"—"}
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  }
+
+  $("allusersFilter").addEventListener("input", renderAllUsers);
+  $("allusersMoreBtn").onclick=()=>loadAllUsers(false);
+
   async function loadApiLogs() {
     setStatus("busy","Cargando logs...");
     $("apiLogsTbody").innerHTML=`<tr><td colspan="5" class="empty"><span class="spinner"></span></td></tr>`;
@@ -799,41 +871,6 @@
   };
   $("searchBtn").onclick=loadUser;
   $("q").addEventListener("keydown",e=>e.key==="Enter"&&loadUser());
-
-  // ── Búsqueda por email / userId ─────────────────────────────────────────
-  async function lookupByEmail() {
-    const q = $("emailQ").value.trim();
-    if (!q) { toast("Introduce un email o userId"); return; }
-    const panel = $("emailResults");
-    panel.style.display = "block";
-    panel.innerHTML = "<span style='color:#888'>Buscando...</span>";
-    try {
-      const { r, data } = await apiFetch(`/api/admin/lookup-by-email?q=${encodeURIComponent(q)}`);
-      if (!r.ok || !data.results?.length) {
-        panel.innerHTML = "<span style='color:#e53e3e'>Usuario no encontrado.</span>";
-        return;
-      }
-      panel.innerHTML = data.results.map((u, i) => `
-        <div style="margin-bottom:${i < data.results.length-1 ? '10px' : '0'};padding-bottom:${i < data.results.length-1 ? '10px' : '0'};border-bottom:${i < data.results.length-1 ? '1px solid #e2e8f0' : 'none'}">
-          <div style="font-size:13px;margin-bottom:4px">
-            <span style="color:#888">Email:</span> <b>${u.email || '—'}</b>
-          </div>
-          <div style="font-size:12px;font-family:monospace;margin-bottom:4px">
-            <span style="color:#888">userId:</span> ${u.userId || '—'}
-          </div>
-          <div style="font-size:12px;font-family:monospace;margin-bottom:6px">
-            <span style="color:#888">deviceId:</span> ${u.deviceId || '—'}
-          </div>
-          ${u.deviceId ? `<button onclick="$('q').value='${u.deviceId}';$('emailResults').style.display='none';loadUser();window.scrollTo({top:0,behavior:'smooth'})" style="font-size:12px;padding:4px 10px;background:#1976D2;color:#fff;border:none;border-radius:6px;cursor:pointer">Cargar en admin →</button>` : ''}
-        </div>
-      `).join('');
-    } catch(e) {
-      panel.innerHTML = `<span style='color:#e53e3e'>Error: ${e.message}</span>`;
-    }
-  }
-  $("emailSearchBtn").onclick = lookupByEmail;
-  $("emailQ").addEventListener("keydown", e => e.key === "Enter" && lookupByEmail());
-
   document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>addCredits(b.dataset.add));
   $("applyBtn").onclick=()=>{const v=$("customCredits").value.trim();if(!v){toast("Pon créditos");return;}addCredits(v);};
   $("reconcileBtn").onclick=reconcile;
@@ -842,11 +879,13 @@
   $("moreBuyersBtn").onclick=()=>loadBuyers(false);
   $("refreshLogsBtn").onclick=loadApiLogs;
   $("applyLogsFilter").onclick=loadApiLogs;
+  document.querySelector("[data-tab='allusers']").addEventListener("click",()=>{
+    if(allUsersData.length===0) loadAllUsers(true);
+  });
   document.querySelector("[data-tab='logs']").addEventListener("click",()=>{if($("logApiCount").textContent==="—")loadApiLogs();});
 </script>
 </body>
 </html>
-
 
 
 
