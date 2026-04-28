@@ -794,7 +794,6 @@
     const filtered=allUsersData.filter(u=>
       !filter||u.email?.toLowerCase().includes(filter)||u.userId?.includes(filter)
     );
-    window._allUsersFiltered = filtered;
     if(!filtered.length){
       $("allusersList").innerHTML=`<div class="empty">Sin resultados</div>`;
       return;
@@ -811,7 +810,7 @@
           </tr>
         </thead>
         <tbody>
-          ${filtered.map((u,idx)=>`
+          ${filtered.map(u=>`
             <tr style="border-bottom:1px solid #f0f0f0">
               <td style="padding:8px 10px"><b>${u.email||"—"}</b></td>
               <td style="padding:8px 10px;font-family:monospace;font-size:11px;color:#666">${u.userId||"—"}</td>
@@ -819,7 +818,7 @@
               <td style="padding:8px 10px;color:#888;font-size:11px">${u.createdAt?u.createdAt.substring(0,10):"—"}</td>
               <td style="padding:8px 10px;display:flex;gap:6px">
                 ${u.deviceId?`<button onclick="$('q').value='${u.deviceId}';document.querySelector('[data-tab=\\'users\\']').click();loadUser();window.scrollTo({top:0,behavior:'smooth'})" style="font-size:11px;padding:3px 8px;background:#1976D2;color:#fff;border:none;border-radius:5px;cursor:pointer">Cargar →</button>`:""}
-                <button onclick="deleteUser(${idx})" style="font-size:11px;padding:3px 8px;background:#dc2626;color:#fff;border:none;border-radius:5px;cursor:pointer">Borrar</button>
+                <button onclick="deleteUser(this)" data-did="${u.deviceId||''}" data-email="${u.email||''}" data-uid="${u.userId||''}" style="font-size:11px;padding:3px 8px;background:#dc2626;color:#fff;border:none;border-radius:5px;cursor:pointer">Borrar</button>
               </td>
             </tr>
           `).join("")}
@@ -831,12 +830,11 @@
   $("allusersFilter").addEventListener("input", renderAllUsers);
   $("allusersMoreBtn").onclick=()=>loadAllUsers(false);
 
-  async function deleteUser(idx) {
-    const u = (window._allUsersFiltered || [])[idx];
-    if (!u) { toast("Error: usuario no encontrado","err"); return; }
-    const deviceId = u.deviceId || null;
-    const userId = u.userId || null;
-    const label = u.email || deviceId || userId;
+  async function deleteUser(btn) {
+    const deviceId = btn.dataset.did || null;
+    const email = btn.dataset.email || null;
+    const userId = btn.dataset.uid || null;
+    const label = email || deviceId || userId;
     const confirm1 = confirm(`¿Borrar usuario ${label}?\n\nSe eliminará de users, user_devices y usage. Sus facturas y PDFs se mantienen.`);
     if (!confirm1) return;
     setStatus("busy","Borrando usuario...");
@@ -848,7 +846,7 @@
       });
       if (!data?.ok) { toast(data?.error||`HTTP ${r.status}`,"err"); setStatus("err","Error"); return; }
       toast(`Usuario ${label} borrado`,"ok");
-      allUsersData = allUsersData.filter(u2 => u2.deviceId !== deviceId && u2.userId !== userId);
+      allUsersData = allUsersData.filter(u => u.deviceId !== deviceId && u.userId !== userId);
       renderAllUsers();
       setStatus("ok","Listo");
     } catch(e) {
@@ -914,6 +912,8 @@
 </script>
 </body>
 </html>
+
+
 
 
 
