@@ -794,9 +794,9 @@
     const filtered=allUsersData.filter(u=>
       !filter||u.email?.toLowerCase().includes(filter)||u.userId?.includes(filter)
     );
+    window._allUsersFiltered = filtered;
     if(!filtered.length){
-      window._allUsersFiltered = filtered;
-    $("allusersList").innerHTML=`<div class="empty">Sin resultados</div>`;
+      $("allusersList").innerHTML=`<div class="empty">Sin resultados</div>`;
       return;
     }
     $("allusersList").innerHTML=`
