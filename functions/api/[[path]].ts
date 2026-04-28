@@ -23,6 +23,7 @@ export const onRequest: PagesFunction = async (context) => {
     "/admin/api-logs": new Set(["GET"]),
     "/admin/history": new Set(["GET", "POST"]),
     "/admin/all-users": new Set(["GET"]),
+    "/admin/delete-user": new Set(["POST"]),
   };
 
   const allowedMethods = allowedRoutes[targetPath];
@@ -154,5 +155,6 @@ async function hmacSha256Hex(secret: string, message: string) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
 
 
