@@ -14,20 +14,8 @@ export const onRequest: PagesFunction = async (context) => {
   const u = new URL(request.url);
   const targetPath = u.pathname.replace(/^\/api/, "");
 
-  const allowedRoutes: Record<string, Set<string>> = {
-    "/admin/user": new Set(["GET"]),
-    "/admin/add-credits": new Set(["POST"]),
-    "/admin/reconcile": new Set(["POST"]),
-    "/admin/reset-user": new Set(["POST"]),
-    "/admin/purchasers": new Set(["GET"]),
-    "/admin/api-logs": new Set(["GET"]),
-    "/admin/history": new Set(["GET", "POST"]),
-    "/admin/all-users": new Set(["GET"]),
-    "/admin/delete-user": new Set(["POST"]),
-  };
-
-  const allowedMethods = allowedRoutes[targetPath];
-  if (!allowedMethods || !allowedMethods.has(request.method)) {
+  // Permitir todas las rutas /admin/* — el worker tiene su propia autenticación
+  if (!targetPath.startsWith("/admin/")) {
     return new Response("Not Found", { status: 404 });
   }
 
@@ -155,6 +143,3 @@ async function hmacSha256Hex(secret: string, message: string) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
-
-
-
