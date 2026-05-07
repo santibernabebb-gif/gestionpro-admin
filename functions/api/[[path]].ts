@@ -72,6 +72,98 @@ export const onRequest: PagesFunction = async (context) => {
     }
   }
 
+
+  // 3b) Actividad de usuarios — lectura directa desde D1 para el panel admin
+  if (targetPath === "/admin/activity-summary") {
+    const db = (env as any)["gestionpro-db"];
+    if (!db) {
+      return new Response(JSON.stringify({ ok: false, error: "D1_BINDING_MISSING" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (request.method !== "GET") return new Response("Method Not Allowed", { status: 405 });
+
+    try {
+      const byEvent = await db.prepare(
+        `SELECT event_type,
+                COUNT(*) AS total,
+                COUNT(DISTINCT COALESCE(user_id, device_id, email, id)) AS unique_actors
+         FROM user_events
+         GROUP BY event_type
+         ORDER BY total DESC`
+      ).all();
+
+      const totalsRow = await db.prepare(
+        `SELECT
+          (SELECT COUNT(*) FROM users) AS users,
+          (SELECT COUNT(DISTINCT COALESCE(user_id, device_id, email)) FROM user_events WHERE event_type = 'LOGIN_OK') AS usersWithLogin,
+          (SELECT COUNT(DISTINCT COALESCE(user_id, device_id, email)) FROM user_events WHERE event_type = 'IA_USED') AS usersWithIa,
+          (SELECT COUNT(DISTINCT COALESCE(user_id, device_id, email)) FROM user_events WHERE event_type = 'PDF_UPLOAD_OK') AS usersWithPdfOk,
+          (SELECT COUNT(*) FROM user_events WHERE event_type = 'PRESUPUESTO_SAVED') AS presupuestosSaved,
+          (SELECT COUNT(*) FROM user_events WHERE event_type = 'FACTURA_SAVED') AS facturasSaved,
+          (SELECT COUNT(*) FROM user_events WHERE event_type = 'PDF_UPLOAD_ERROR') AS pdfUploadErrors,
+          (SELECT COUNT(*) FROM user_events WHERE created_at >= datetime('now','-24 hours')) AS eventsLast24h`
+      ).first();
+
+      return new Response(JSON.stringify({ ok: true, totals: totalsRow || {}, byEvent: byEvent.results || [] }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (e: any) {
+      return new Response(JSON.stringify({ ok: false, error: "ACTIVITY_QUERY_FAILED", detail: String(e?.message || e) }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
+  if (targetPath === "/admin/user-events") {
+    const db = (env as any)["gestionpro-db"];
+    if (!db) {
+      return new Response(JSON.stringify({ ok: false, error: "D1_BINDING_MISSING" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (request.method !== "GET") return new Response("Method Not Allowed", { status: 405 });
+
+    const limitRaw = parseInt(u.searchParams.get("limit") || "100", 10);
+    const limit = Math.max(1, Math.min(500, Number.isFinite(limitRaw) ? limitRaw : 100));
+    const eventType = (u.searchParams.get("eventType") || "").trim();
+    const emailFilter = (u.searchParams.get("email") || "").trim().toLowerCase();
+    const deviceId = (u.searchParams.get("deviceId") || "").trim();
+    const userId = (u.searchParams.get("userId") || "").trim();
+
+    const where: string[] = [];
+    const params: any[] = [];
+
+    if (eventType) { where.push("event_type = ?"); params.push(eventType); }
+    if (emailFilter) { where.push("LOWER(COALESCE(email,'')) LIKE ?"); params.push(`%${emailFilter}%`); }
+    if (deviceId) { where.push("device_id = ?"); params.push(deviceId); }
+    if (userId) { where.push("user_id = ?"); params.push(userId); }
+
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+    try {
+      const rows = await db.prepare(
+        `SELECT id, user_id, device_id, email, event_type, entity_type, entity_id, details, created_at
+         FROM user_events
+         ${whereSql}
+         ORDER BY created_at DESC
+         LIMIT ?`
+      ).bind(...params, limit).all();
+
+      return new Response(JSON.stringify({ ok: true, events: rows.results || [] }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (e: any) {
+      return new Response(JSON.stringify({ ok: false, error: "USER_EVENTS_QUERY_FAILED", detail: String(e?.message || e) }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
   // 4) Proxy firmado hacia el Worker, con selector de entorno
   const envParam = (u.searchParams.get("env") || "prod").toLowerCase();
 
