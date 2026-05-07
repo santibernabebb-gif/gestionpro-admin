@@ -223,6 +223,7 @@
       <button class="tab active" data-tab="users">👤 Usuarios</button>
       <button class="tab" data-tab="buyers">💳 Compradores</button>
       <button class="tab" data-tab="allusers">👥 Todos los usuarios</button>
+      <button class="tab" data-tab="activity">📈 Actividad</button>
       <button class="tab" data-tab="logs">🔍 API Logs</button>
     </div>
     <div class="spill">
@@ -424,6 +425,101 @@
         <div id="allusersList"></div>
         <div style="margin-top:12px;display:flex;gap:8px">
           <button id="allusersMoreBtn" class="btn" style="display:none">Cargar más</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══ ACTIVIDAD ══ -->
+  <div class="page" id="tab-activity">
+    <div class="stack">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><div class="cicon">📈</div>Actividad real de usuarios</div>
+          <div class="row">
+            <div id="activityCount" class="badge">—</div>
+            <button id="refreshActivityBtn" class="btn sm primary">↻ Actualizar</button>
+          </div>
+        </div>
+        <div class="card-body" style="border-bottom:1px solid var(--border)">
+          <div class="g3">
+            <div class="kpi blue">
+              <div id="actKpiUsers" class="kpi-num">—</div>
+              <div class="kpi-label">Usuarios registrados</div>
+            </div>
+            <div class="kpi">
+              <div id="actKpiIa" class="kpi-num">—</div>
+              <div class="kpi-label">Usuarios con IA</div>
+            </div>
+            <div class="kpi ok">
+              <div id="actKpiPdf" class="kpi-num">—</div>
+              <div class="kpi-label">Usuarios con PDF OK</div>
+            </div>
+            <div class="kpi">
+              <div id="actKpiPresu" class="kpi-num">—</div>
+              <div class="kpi-label">Presupuestos guardados</div>
+            </div>
+            <div class="kpi">
+              <div id="actKpiFact" class="kpi-num">—</div>
+              <div class="kpi-label">Facturas guardadas</div>
+            </div>
+            <div class="kpi danger">
+              <div id="actKpiPdfErr" class="kpi-num">—</div>
+              <div class="kpi-label">Errores PDF</div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="info-box">
+            Esta pestaña lee la tabla <span class="mono">user_events</span>. Sirve para ver si un usuario solo entra, usa IA, guarda presupuesto o llega a subir PDF.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><div class="cicon">🧭</div>Embudo por evento</div>
+          <div id="activitySummaryPill" class="badge">—</div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Evento</th><th>Total eventos</th><th>Usuarios/dispositivos</th></tr></thead>
+            <tbody id="activitySummaryTbody"><tr><td colspan="3" class="empty">Pulsa "Actualizar"</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><div class="cicon">🕐</div>Eventos recientes</div>
+          <div id="activityEventsPill" class="badge">—</div>
+        </div>
+        <div class="filter-bar">
+          <input id="activityEmailFilter" class="input" placeholder="Filtrar por email..." style="max-width:240px" />
+          <input id="activityDeviceFilter" class="input" placeholder="deviceId..." style="max-width:220px" />
+          <select id="activityTypeFilter" class="fsel">
+            <option value="">Todos los eventos</option>
+            <option value="LOGIN_OK">LOGIN_OK</option>
+            <option value="IA_USED">IA_USED</option>
+            <option value="IA_ERROR">IA_ERROR</option>
+            <option value="PRESUPUESTO_SAVED">PRESUPUESTO_SAVED</option>
+            <option value="FACTURA_SAVED">FACTURA_SAVED</option>
+            <option value="PDF_UPLOAD_OK">PDF_UPLOAD_OK</option>
+            <option value="PDF_UPLOAD_ERROR">PDF_UPLOAD_ERROR</option>
+          </select>
+          <select id="activityLimitFilter" class="fsel">
+            <option value="100">Últimos 100</option>
+            <option value="250">Últimos 250</option>
+            <option value="500">Últimos 500</option>
+          </select>
+          <button id="applyActivityFilter" class="btn sm">Filtrar</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Fecha</th><th>Email</th><th>Evento</th><th>Entidad</th><th>Device/User</th><th>Detalles</th></tr></thead>
+            <tbody id="activityEventsTbody"><tr><td colspan="6" class="empty">Pulsa "Actualizar" para cargar eventos</td></tr></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -884,6 +980,92 @@
     setStatus("ok","Listo");
   }
 
+
+  function eventBadge(type) {
+    const t = String(type || "").toUpperCase();
+    if (t === "PDF_UPLOAD_OK" || t === "PRESUPUESTO_SAVED" || t === "FACTURA_SAVED" || t === "LOGIN_OK") return `<span class="badge ok">${esc(t)}</span>`;
+    if (t === "IA_USED") return `<span class="badge blue">${esc(t)}</span>`;
+    if (t.includes("ERROR")) return `<span class="badge bad">${esc(t)}</span>`;
+    return `<span class="badge">${esc(t || "—")}</span>`;
+  }
+
+  function compactId(v) {
+    const s = String(v || "");
+    if (!s) return "—";
+    return s.length > 18 ? s.slice(0, 18) + "…" : s;
+  }
+
+  async function loadActivity() {
+    setStatus("busy", "Cargando actividad...");
+    if ($("activitySummaryTbody")) $("activitySummaryTbody").innerHTML = `<tr><td colspan="3" class="empty"><span class="spinner"></span></td></tr>`;
+    if ($("activityEventsTbody")) $("activityEventsTbody").innerHTML = `<tr><td colspan="6" class="empty"><span class="spinner"></span></td></tr>`;
+
+    const email = $("activityEmailFilter")?.value.trim() || "";
+    const deviceId = $("activityDeviceFilter")?.value.trim() || "";
+    const eventType = $("activityTypeFilter")?.value || "";
+    const limit = $("activityLimitFilter")?.value || "100";
+
+    let qs = `?limit=${encodeURIComponent(limit)}`;
+    if (email) qs += `&email=${encodeURIComponent(email)}`;
+    if (deviceId) qs += `&deviceId=${encodeURIComponent(deviceId)}`;
+    if (eventType) qs += `&eventType=${encodeURIComponent(eventType)}`;
+
+    const [summaryRes, eventsRes] = await Promise.all([
+      apiFetch("/api/admin/activity-summary"),
+      apiFetch(`/api/admin/user-events${qs}`)
+    ]);
+
+    const summary = summaryRes.data;
+    if (!summary?.ok) {
+      setStatus("err", "Error");
+      $("activitySummaryTbody").innerHTML = `<tr><td colspan="3" class="empty">Error: ${esc(summary?.error || summaryRes.r.status)}</td></tr>`;
+      toast(summary?.error || `HTTP ${summaryRes.r.status}`, "err");
+      return;
+    }
+
+    const totals = summary.totals || {};
+    $("actKpiUsers").textContent = fmt(totals.users || 0);
+    $("actKpiIa").textContent = fmt(totals.usersWithIa || 0);
+    $("actKpiPdf").textContent = fmt(totals.usersWithPdfOk || 0);
+    $("actKpiPresu").textContent = fmt(totals.presupuestosSaved || 0);
+    $("actKpiFact").textContent = fmt(totals.facturasSaved || 0);
+    $("actKpiPdfErr").textContent = fmt(totals.pdfUploadErrors || 0);
+
+    const byEvent = summary.byEvent || [];
+    $("activitySummaryPill").textContent = byEvent.length + " tipos";
+    $("activitySummaryTbody").innerHTML = byEvent.length === 0
+      ? `<tr><td colspan="3" class="empty">Sin eventos todavía</td></tr>`
+      : byEvent.map(e => `<tr>
+          <td>${eventBadge(e.event_type)}</td>
+          <td style="font-weight:700">${fmt(e.total)}</td>
+          <td>${fmt(e.unique_actors)}</td>
+        </tr>`).join("");
+
+    const evData = eventsRes.data;
+    if (!evData?.ok) {
+      setStatus("err", "Error");
+      $("activityEventsTbody").innerHTML = `<tr><td colspan="6" class="empty">Error: ${esc(evData?.error || eventsRes.r.status)}</td></tr>`;
+      toast(evData?.error || `HTTP ${eventsRes.r.status}`, "err");
+      return;
+    }
+
+    const events = evData.events || [];
+    $("activityCount").textContent = events.length + " eventos";
+    $("activityEventsPill").textContent = events.length + " registros";
+    $("activityEventsTbody").innerHTML = events.length === 0
+      ? `<tr><td colspan="6" class="empty">Sin eventos para esos filtros</td></tr>`
+      : events.map(e => `<tr>
+          <td class="mono">${esc(fmtDate(e.created_at))}</td>
+          <td>${esc(e.email || "—")}</td>
+          <td>${eventBadge(e.event_type)}</td>
+          <td><span class="badge">${esc(e.entity_type || "—")}</span><div class="mono">${esc(compactId(e.entity_id))}</div></td>
+          <td><div class="mono">D: ${esc(compactId(e.device_id))}</div><div class="mono">U: ${esc(compactId(e.user_id))}</div></td>
+          <td class="mono" title="${esc(e.details || "")}">${esc(compactId(e.details || ""))}</td>
+        </tr>`).join("");
+
+    setStatus("ok", "Listo");
+  }
+
   $("saveAliasBtn").onclick=async()=>{
     if(!currentDeviceId){toast("Busca un usuario primero");return;}
     const alias=$("aliasInput").value.trim();
@@ -905,13 +1087,17 @@
   $("moreBuyersBtn").onclick=()=>loadBuyers(false);
   $("refreshLogsBtn").onclick=loadApiLogs;
   $("applyLogsFilter").onclick=loadApiLogs;
+  $("refreshActivityBtn").onclick=loadActivity;
+  $("applyActivityFilter").onclick=loadActivity;
   document.querySelector("[data-tab='allusers']").addEventListener("click",()=>{
     if(allUsersData.length===0) loadAllUsers(true);
   });
+  document.querySelector("[data-tab='activity']").addEventListener("click",()=>{if($("activityCount").textContent==="—")loadActivity();});
   document.querySelector("[data-tab='logs']").addEventListener("click",()=>{if($("logApiCount").textContent==="—")loadApiLogs();});
 </script>
 </body>
 </html>
+
 
 
 
